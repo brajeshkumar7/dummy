@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core'
+import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -32,6 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   AdvancedFilterPanel,
   SavedSearchesDropdown,
+  SaveSearchDialog,
   savedSearchUtils
 } from '@/components/saved-searches'
 import { ExportDialog, BulkExportDialog } from '@/components/export-dialog'
@@ -150,7 +151,8 @@ function KanbanColumn({ stage, candidates, onCandidateMove }) {
     setNodeRef,
     isOver
   } = useDroppable({
-    id: stage
+    id: stage,
+    data: { type: 'column', stage }
   })
 
   const stageLabels = {
@@ -224,7 +226,7 @@ function KanbanCard({ candidate, onMove }) {
     transform,
     transition,
     isDragging
-  } = useSortable({ id: candidate.id })
+  } = useSortable({ id: candidate.id, data: { type: 'card', stage: candidate.stage } })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -269,6 +271,7 @@ function KanbanCard({ candidate, onMove }) {
 // Candidate Form Component
 function CandidateForm({ candidate = null, onSave, onCancel }) {
   const [formData, setFormData] = useState({
+    id: candidate?.id || '',
     name: candidate?.name || '',
     email: candidate?.email || '',
     phone: candidate?.phone || '',
@@ -292,7 +295,7 @@ function CandidateForm({ candidate = null, onSave, onCancel }) {
           <Input
             id="id"
             value={formData.id}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, id: e.target.value })}
             placeholder="Enter Cand ID(opt as auto gen for uniqueness)"
             required
           />
@@ -345,8 +348,8 @@ function CandidateForm({ candidate = null, onSave, onCancel }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="applied">Applied</SelectItem>
-              <SelectItem value="review">Screen</SelectItem>
-              <SelectItem value="interview">Test</SelectItem>
+              <SelectItem value="screen">Screen</SelectItem>
+              <SelectItem value="test">Test</SelectItem>
               <SelectItem value="offer">Offer</SelectItem>
               <SelectItem value="hired">Hired</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
@@ -450,23 +453,21 @@ export function CandidatesPage() {
   }), [positionFilter, stageFilter, locationFilter, sortBy, sortOrder])
 
   const handleSaveCurrentSearch = () => {
-    // Save current search to recent searches
-    savedSearchUtils.addRecentSearch('candidates', {
-      query: search,
-      filters: currentFilters,
-      timestamp: Date.now()
-    })
+    // Record recent query text only
+    savedSearchUtils.addRecentSearch(search || '')
+    // Open save search dialog
     setIsSaveSearchOpen(true)
   }
 
   const handleApplySavedSearch = (savedSearch) => {
-    // Apply saved search
-    setSearch(savedSearch.query)
-    if (savedSearch.filters.position) setPositionFilter(savedSearch.filters.position)
-    if (savedSearch.filters.stage) setStageFilter(savedSearch.filters.stage)
-    if (savedSearch.filters.location) setLocationFilter(savedSearch.filters.location)
-    if (savedSearch.filters.sortBy) setSortBy(savedSearch.filters.sortBy)
-    if (savedSearch.filters.sortOrder) setSortOrder(savedSearch.filters.sortOrder)
+    const filters = savedSearch?.filters || {}
+    const queryText = savedSearch?.searchQuery || ''
+    setSearch(queryText)
+    setPositionFilter(filters.position || 'all')
+    setStageFilter(filters.stage || 'all')
+    setLocationFilter(filters.location || 'all')
+    if (filters.sortBy) setSortBy(filters.sortBy)
+    if (filters.sortOrder) setSortOrder(filters.sortOrder)
     setPage(1)
   }
 
@@ -544,7 +545,7 @@ export function CandidatesPage() {
 
   // Drag and drop sensors for kanban
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates
     })
@@ -701,16 +702,40 @@ export function CandidatesPage() {
   // Enhanced export functionality is now handled by ExportDialog component
 
   // Kanban drag end handler
+  const [activeId, setActiveId] = useState(null)
+
+  const handleKanbanDragStart = (event) => {
+    setActiveId(event.active?.id ?? null)
+  }
+
   const handleKanbanDragEnd = async (event) => {
     const { active, over } = event
+    if (!over) return
 
-    if (over && active.id !== over.id) {
-      const candidateId = active.id
-      const newStage = over.id
+    const activeStage = active.data?.current?.stage
+    let targetStage = null
 
-      await handleStageChange(candidateId, newStage)
+    const overType = over.data?.current?.type
+    if (overType === 'column') {
+      targetStage = over.data.current.stage || String(over.id)
+    } else if (overType === 'card') {
+      targetStage = over.data.current.stage
+    } else {
+      // Fallback: if we somehow hovered over an element without data, try id when it's a known stage
+      if (typeof over.id === 'string') targetStage = over.id
     }
+
+    if (!targetStage) return
+
+    // Only update when the stage actually changes
+    if (activeStage !== targetStage) {
+      const candidateId = active.id
+      await handleStageChange(candidateId, targetStage)
+    }
+    setActiveId(null)
   }
+
+  const handleKanbanDragCancel = () => setActiveId(null)
 
   // Table configuration
   const tableConfig = {
@@ -834,7 +859,7 @@ export function CandidatesPage() {
         {
           label: 'Move to Test',
           icon: ArrowRightIcon,
-          onClick: (candidate) => handleStageChange(candidate.id, 'interview')
+          onClick: (candidate) => handleStageChange(candidate.id, 'test')
         },
         {
           label: 'Delete',
@@ -892,31 +917,31 @@ export function CandidatesPage() {
 
           <Card className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl hover:shadow-blue-500/25 transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">In Review</CardTitle>
+              <CardTitle className="text-sm font-medium text-white">In Screen</CardTitle>
               <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center">
                 <FileTextIcon className="h-4 w-4 text-white" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                {candidatesByStage.review?.length || 0}
+                {candidatesByStage.screen?.length || 0}
               </div>
               <p className="text-xs text-white/70 mt-1">
-                Pending review
+                Pending screen
               </p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl hover:shadow-amber-500/25 transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">Interviews</CardTitle>
+              <CardTitle className="text-sm font-medium text-white">Tests</CardTitle>
               <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center">
                 <CalendarIcon className="h-4 w-4 text-white" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                {candidatesByStage.interview?.length || 0}
+                {candidatesByStage.test?.length || 0}
               </div>
               <p className="text-xs text-white/70 mt-1">
                 Scheduled or completed
@@ -968,7 +993,9 @@ export function CandidatesPage() {
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
+                onDragStart={handleKanbanDragStart}
                 onDragEnd={handleKanbanDragEnd}
+                onDragCancel={handleKanbanDragCancel}
               >
                 <div className="flex gap-4 overflow-x-auto pb-4">
                   {Object.entries(candidatesByStage).map(([stage, stageCandidates]) => (
@@ -980,6 +1007,30 @@ export function CandidatesPage() {
                     />
                   ))}
                 </div>
+                <DragOverlay>
+                  {activeId ? (
+                    // Render a lightweight preview; lookup candidate by id from grouped data
+                    (() => {
+                      const all = Object.values(candidatesByStage || {}).flat()
+                      const cand = all.find(c => c.id === activeId)
+                      return cand ? (
+                        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 rounded-2xl p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                                {cand.name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate text-white">{cand.name}</h4>
+                              <p className="text-xs text-white/70 truncate">{cand.position}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null
+                    })()
+                  ) : null}
+                </DragOverlay>
               </DndContext>
             </CardContent>
           </Card>
@@ -1009,6 +1060,17 @@ export function CandidatesPage() {
                   description="Export candidates data in your preferred format"
                   onExportComplete={(format, columns, records) => {
                     console.log(`Exported ${records} candidates in ${format} format with ${columns} columns`)
+                  }}
+                />
+                <SaveSearchDialog
+                  isOpen={isSaveSearchOpen}
+                  onOpenChange={setIsSaveSearchOpen}
+                  currentFilters={currentFilters}
+                  searchQuery={search}
+                  type="candidates"
+                  onSave={(saved) => {
+                    // After saving, reflect applied search immediately
+                    handleApplySavedSearch(saved)
                   }}
                 />
                 <BulkExportDialog

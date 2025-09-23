@@ -48,16 +48,28 @@ export function JobEditPage() {
   // Populate form when job data loads
   useEffect(() => {
     if (job) {
+      const normalize = (value, map) => {
+        if (!value) return ''
+        const v = String(value).toLowerCase()
+        return map.includes(v) ? v : map[0]
+      }
+
+      const employmentOptions = ['full-time', 'part-time', 'contract', 'freelance']
+      const experienceOptions = ['junior', 'mid', 'senior', 'lead', 'principal']
+      const statusOptions = ['active', 'draft', 'paused', 'archived', 'closed']
+
+      const normalizedDepartment = departments.includes(job.department) ? job.department : departments[0]
+
       setFormData({
         title: job.title || '',
-        department: job.department || 'Engineering',
+        department: normalizedDepartment,
         description: job.description || '',
         requirements: job.requirements || '',
         location: job.location || '',
         salary_range: job.salary_range || '',
-        employment_type: job.employment_type || 'Full-time',
-        experience_level: job.experience_level || 'Mid-Level',
-        status: job.status || 'Draft',
+        employment_type: normalize(job.employment_type || 'full-time', employmentOptions),
+        experience_level: normalize(job.experience_level || 'mid', experienceOptions),
+        status: normalize(job.status || 'draft', statusOptions),
         order: job.order
       })
       setTags(job.tags || [])
@@ -121,17 +133,23 @@ export function JobEditPage() {
       return
     }
 
-    if (!formData.department) {
-      toast.error('Please select a department')
-      return
-    }
+    // Do not hard-block on department; backend will preserve existing when omitted
 
+    // Build PATCH payload; omit department if empty so server keeps existing
     const jobData = {
       id: job.id,
-      ...formData,
-      order: Number(formData.order), // <-- Add this line to convert order to number
+      title: formData.title,
+      description: formData.description,
+      requirements: formData.requirements,
+      location: formData.location,
+      salary_range: formData.salary_range,
+      employment_type: formData.employment_type,
+      experience_level: formData.experience_level,
+      status: formData.status,
+      order: formData.order === '' || formData.order == null ? undefined : Number(formData.order),
       tags
     }
+    if (formData.department) jobData.department = formData.department
 
     //updateJobMutation.mutate(jobData)
     updateJobMutation.mutate(jobData, {
@@ -225,7 +243,7 @@ export function JobEditPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           {/* Enhanced Job Information Card */}
           <div className="relative">
             <div className="absolute -top-10 -left-10 w-32 h-32 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-full blur-3xl"></div>
@@ -263,7 +281,6 @@ export function JobEditPage() {
                     <Select
                       value={formData.department}
                       onValueChange={value => handleInputChange('department', value)}
-                      required
                     >
                       <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-orange-400/50 focus:ring-orange-400/20 rounded-xl backdrop-blur-sm">
                         <SelectValue placeholder="Select department" />
@@ -307,6 +324,7 @@ export function JobEditPage() {
                     <Select
                       value={formData.employment_type}
                       onValueChange={(value) => handleInputChange('employment_type', value)}
+                      required
                     >
                       <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-orange-400/50 focus:ring-orange-400/20 rounded-xl backdrop-blur-sm">
                         <SelectValue placeholder="Select employement-type" />
@@ -325,6 +343,7 @@ export function JobEditPage() {
                     <Select
                       value={formData.experience_level}
                       onValueChange={value => handleInputChange('experience_level', value)}
+                      required
                     >
                       <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-orange-400/50 focus:ring-orange-400/20 rounded-xl backdrop-blur-sm">
                         <SelectValue placeholder="Select experience-level" />
@@ -344,6 +363,7 @@ export function JobEditPage() {
                     <Select
                       value={formData.status}
                       onValueChange={(value) => handleInputChange('status', value)}
+                      required
                     >
                       <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-orange-400/50 focus:ring-orange-400/20 rounded-xl backdrop-blur-sm">
                         <SelectValue placeholder="Select status" />

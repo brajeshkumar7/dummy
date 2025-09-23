@@ -7,19 +7,18 @@ import { initializeDatabase } from './lib/db'
 
 // Start MSW in development
 if (import.meta.env.DEV) {
-  worker.start({
-    onUnhandledRequest: 'bypass',
-  }).then(async () => {
-    // Initialize database after MSW is ready
-    await initializeDatabase()
-    
-    // Render the app
-    createRoot(document.getElementById('root')).render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
-    )
-  })
+  // Seed database first to guarantee data availability for initial queries
+  initializeDatabase()
+    .catch(() => { })
+    .finally(() => {
+      worker.start({ onUnhandledRequest: 'bypass' }).finally(() => {
+        createRoot(document.getElementById('root')).render(
+          <StrictMode>
+            <App />
+          </StrictMode>,
+        )
+      })
+    })
 } else {
   // In production, just initialize database and render
   initializeDatabase().then(() => {

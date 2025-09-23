@@ -125,7 +125,8 @@ export function useUpdateCandidate() {
     mutationFn: candidatesApi.update,
     onSuccess: (updatedCandidate) => {
       // Update specific candidate in cache
-      queryClient.setQueryData(['candidates', updatedCandidate.id], updatedCandidate)
+      //queryClient.setQueryData(['candidates', updatedCandidate.id], updatedCandidate)
+      queryClient.invalidateQueries({ queryKey: ['candidate', String(updatedCandidate.id)] });
 
       // Invalidate candidates list to ensure consistency
       queryClient.invalidateQueries({ queryKey: ['candidates'], exact: false })
@@ -138,7 +139,7 @@ export function useUpdateCandidateStatus() {
 
   return useMutation({
     mutationFn: (updateData) => candidatesApi.patch(updateData), // Using the new patch method
-    onSuccess: (updatedCandidate) => {
+    /*onSuccess: (updatedCandidate) => {
       // Update the specific candidate's cache to avoid a flash of old data
       queryClient.setQueryData(['candidate', updatedCandidate.id], updatedCandidate);
 
@@ -149,6 +150,19 @@ export function useUpdateCandidateStatus() {
     onError: (error) => {
       // You can add default error handling here if you wish
       console.error("Failed to update candidate status", error);
+    }*/
+    onSuccess: (updatedCandidate) => {
+      // Invalidate the detail page query to trigger a refetch of this specific candidate
+      queryClient.invalidateQueries({ queryKey: ['candidate', String(updatedCandidate.id)] });
+
+      // Invalidate list-based queries to update the main list and Kanban board
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+
+      toast.success('Candidate stage updated successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to update candidate stage');
+      console.error("Failed to update candidate stage", error);
     }
   });
 }
@@ -175,12 +189,13 @@ export function useUpdateCandidateStage() {
     mutationFn: candidatesApi.updateStage,
     onSuccess: (updatedCandidate) => {
       // Update specific candidate in cache
-      queryClient.setQueryData(['candidates', updatedCandidate.id], updatedCandidate)
+      // queryClient.setQueryData(['candidates', updatedCandidate.id], updatedCandidate)
+
+      queryClient.invalidateQueries({ queryKey: ['candidate', String(updatedCandidate.id)] });
 
       // Invalidate candidates list and applications to ensure consistency
       queryClient.invalidateQueries({ queryKey: ['candidates'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['applications'], exact: false })
-      // --- ADD THIS LINE TO FIX THE KANBAN VIEW ---
       // This invalidation is crucial for the Kanban UI to update.
       queryClient.invalidateQueries({ queryKey: ['candidates', 'by-stage'] });
     }

@@ -70,7 +70,7 @@ export const savedSearchUtils = {
 
   updateLastUsed: (id) => {
     const searches = savedSearchUtils.getSavedSearches()
-    const updated = searches.map(s => 
+    const updated = searches.map(s =>
       s.id === id ? { ...s, lastUsed: new Date().toISOString() } : s
     )
     localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(updated))
@@ -86,24 +86,24 @@ export const savedSearchUtils = {
 
   addRecentSearch: (searchQuery) => {
     if (!searchQuery.trim()) return
-    
+
     const recent = savedSearchUtils.getRecentSearches()
     const filtered = recent.filter(s => s.query !== searchQuery.trim())
     const updated = [
       { query: searchQuery.trim(), timestamp: new Date().toISOString() },
       ...filtered
     ].slice(0, 10) // Keep only 10 recent searches
-    
+
     localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated))
   }
 }
 
 // Save Search Dialog Component
-export function SaveSearchDialog({ 
-  currentFilters, 
-  searchQuery, 
-  isOpen, 
-  onOpenChange, 
+export function SaveSearchDialog({
+  currentFilters,
+  searchQuery,
+  isOpen,
+  onOpenChange,
   onSave,
   type = 'jobs' // 'jobs' | 'candidates'
 }) {
@@ -123,6 +123,10 @@ export function SaveSearchDialog({
     }
 
     const savedSearch = savedSearchUtils.saveSearch(search)
+    // Notify any listeners (e.g., dropdown) that saved searches were updated
+    try {
+      window.dispatchEvent(new CustomEvent('saved-searches:updated', { detail: { type } }))
+    } catch { }
     onSave?.(savedSearch)
     setSearchName('')
     setDescription('')
@@ -175,7 +179,7 @@ export function SaveSearchDialog({
                   <span className="text-sm">"{searchQuery}"</span>
                 </div>
               )}
-              
+
               {activeFilters.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {activeFilters.map(({ key, value }) => (
@@ -208,7 +212,7 @@ export function SaveSearchDialog({
 }
 
 // Saved Searches Dropdown Component
-export function SavedSearchesDropdown({ 
+export function SavedSearchesDropdown({
   onApplySearch,
   onDeleteSearch,
   type = 'jobs',
@@ -218,8 +222,23 @@ export function SavedSearchesDropdown({
   const [recentSearches, setRecentSearches] = useState([])
 
   useEffect(() => {
-    setSavedSearches(savedSearchUtils.getSavedSearches().filter(s => s.type === type))
-    setRecentSearches(savedSearchUtils.getRecentSearches())
+    const load = () => {
+      setSavedSearches(savedSearchUtils.getSavedSearches().filter(s => s.type === type))
+      setRecentSearches(savedSearchUtils.getRecentSearches())
+    }
+    load()
+    const onStorage = (e) => {
+      if (e.key === 'talentflow_saved_searches' || e.key === 'talentflow_recent_searches') load()
+    }
+    const onCustom = (e) => {
+      if (!e?.detail?.type || e.detail.type === type) load()
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('saved-searches:updated', onCustom)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('saved-searches:updated', onCustom)
+    }
   }, [type])
 
   const handleApplySearch = (search) => {
@@ -255,7 +274,7 @@ export function SavedSearchesDropdown({
           )}
         </Button>
       </DropdownMenuTrigger>
-      
+
       <DropdownMenuContent className="w-80" align="start">
         {/* Recently Used Saved Searches */}
         {recentlySaved.length > 0 && (
@@ -376,7 +395,7 @@ export function SavedSearchesDropdown({
 }
 
 // Advanced Filter Panel Component
-export function AdvancedFilterPanel({ 
+export function AdvancedFilterPanel({
   filters,
   onFilterChange,
   filterOptions,
@@ -431,7 +450,7 @@ export function AdvancedFilterPanel({
             </div>
           ))}
         </div>
-        
+
         {activeFiltersCount > 0 && (
           <div className="mt-4 pt-3 border-t">
             <div className="flex items-center justify-between">

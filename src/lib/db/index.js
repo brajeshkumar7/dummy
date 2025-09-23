@@ -6,8 +6,8 @@ export class TalentFlowDatabase extends Dexie {
 
     this.version(1).stores({
       jobs: '++id, title, department, status, description, requirements, created_at, updated_at, slug, tags, archived',
-      candidates: '++id, name, email, phone, position, stage, experience, location, resume_url, notes, created_at, updated_at',
-      applications: '++id, job_id, candidate_id, status, applied_at, notes, stage_history',
+      candidates: '++id, name, email, phone, position, stage, experience, location, resume_url, notes, created_at, updated_at, stage_history',
+      applications: '++id, job_id, candidate_id, stage, applied_at, notes, stage_history',
       assessments: '++id, job_id, title, description, questions, created_at, updated_at',
       assessment_responses: '++id, assessment_id, candidate_id, responses, score, completed_at'
     })
@@ -86,6 +86,19 @@ function generateCandidates() {
     const location = locations[i % locations.length]
     const stage = stages[i % stages.length]
     const experience = `${Math.floor(Math.random() * 10) + 1} years`
+    const createdAt = new Date(Date.now() - Math.random() * 60 * 24 * 60 * 60 * 1000); // Last 60 days
+    const stageHistory = [{
+      stage: 'applied',
+      date: createdAt.toISOString(),
+      notes: 'Initial application received'
+    }];
+    if (stage !== 'applied') {
+      stageHistory.push({
+        stage: stage,
+        date: new Date(createdAt.getTime() + Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(), // Sometime after applying
+        notes: `Stage updated to ${stage}`
+      });
+    }
 
     candidates.push({
       id: i,
@@ -98,8 +111,10 @@ function generateCandidates() {
       location,
       resume_url: `https://example.com/resume-${i}.pdf`,
       notes: `${name} is a ${experience} experienced ${position} with excellent skills and strong background.`,
-      created_at: new Date(Date.now() - Math.random() * 60 * 24 * 60 * 60 * 1000), // Last 60 days
-      updated_at: new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000)  // Last 14 days
+      //created_at: new Date(Date.now() - Math.random() * 60 * 24 * 60 * 60 * 1000), // Last 60 days
+      created_at: createdAt,
+      updated_at: new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000),  // Last 14 days
+      stage_history: stageHistory // ADD THIS LINE
     })
   }
   return candidates
@@ -122,7 +137,7 @@ function generateApplications(jobs, candidates) {
         id: id++,
         job_id: job.id,
         candidate_id: candidate.id,
-        status: candidate.stage,
+        stage: candidate.stage,
         applied_at: new Date(Date.now() - Math.random() * 45 * 24 * 60 * 60 * 1000), // Last 45 days
         notes: `Application for ${job.title}`,
         stage_history: [

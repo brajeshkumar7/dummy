@@ -1,4 +1,4 @@
- import { http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { db } from '../lib/db'
 
 // Simulate network conditions according to PDF requirements
@@ -6,7 +6,7 @@ import { db } from '../lib/db'
 function simulateNetworkConditions() {
   const delay = Math.floor(Math.random() * 1000) + 200 // 200-1200ms delay
   const shouldError = Math.random() < 0.075 // 7.5% error rate (between 5-10%)
-  
+
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({ shouldError })
@@ -19,7 +19,7 @@ async function handleNetworkSimulation() {
   const result = await simulateNetworkConditions()
   if (result.shouldError) {
     return HttpResponse.json(
-      { error: 'Network simulation error', message: 'Simulated network failure' }, 
+      { error: 'Network simulation error', message: 'Simulated network failure' },
       { status: 500 }
     )
   }
@@ -30,7 +30,7 @@ async function handleNetworkSimulation() {
 function paginate(data, page = 1, limit = 10) {
   const offset = (page - 1) * limit
   const paginatedData = data.slice(offset, offset + limit)
-  
+
   return {
     data: paginatedData,
     pagination: {
@@ -46,82 +46,82 @@ function paginate(data, page = 1, limit = 10) {
 // Helper function for filtering and searching
 function filterAndSearch(data, params) {
   let filtered = [...data]
-  
+
   // Search functionality
   if (params.search) {
     const searchTerm = params.search.toLowerCase()
     filtered = filtered.filter(item => {
-      return Object.values(item).some(value => 
+      return Object.values(item).some(value =>
         value && value.toString().toLowerCase().includes(searchTerm)
       )
     })
   }
-  
+
   // Department filter (for jobs)
   if (params.department && params.department !== 'all') {
     filtered = filtered.filter(item => item.department === params.department)
   }
-  
+
   // Status filter
   if (params.status && params.status !== 'all') {
     filtered = filtered.filter(item => item.status === params.status)
   }
-  
+
   // Position filter (for candidates)
   if (params.position && params.position !== 'all') {
     filtered = filtered.filter(item => item.position === params.position)
   }
-  
+
   // Stage filter (for candidates)
   if (params.stage && params.stage !== 'all') {
     filtered = filtered.filter(item => item.stage === params.stage)
   }
-  
+
   // Location filter (for candidates)
   if (params.location && params.location !== 'all') {
     filtered = filtered.filter(item => item.location === params.location)
   }
-  
+
   // Experience filter (for candidates)
   if (params.experience && params.experience !== 'all') {
     filtered = filtered.filter(item => item.experience === params.experience)
   }
-  
+
   // Job ID filter (for applications)
   if (params.job_id) {
     filtered = filtered.filter(item => item.job_id === parseInt(params.job_id))
   }
-  
+
   // Candidate ID filter (for applications)
   if (params.candidate_id) {
     filtered = filtered.filter(item => item.candidate_id === parseInt(params.candidate_id))
   }
-  
+
   // Assessment ID filter (for responses)
   if (params.assessment_id) {
     filtered = filtered.filter(item => item.assessment_id === parseInt(params.assessment_id))
   }
-  
+
   // Sorting
   if (params.sort_by) {
     const sortField = params.sort_by
     const sortOrder = params.sort_order === 'desc' ? -1 : 1
-    
+
     filtered.sort((a, b) => {
       let aVal = a[sortField]
       let bVal = b[sortField]
-      
+
       // Handle null/undefined values
       if (aVal == null && bVal == null) return 0
       if (aVal == null) return sortOrder // null values go to end
       if (bVal == null) return -sortOrder
-      
+
       // Handle date fields
       if (sortField.includes('_at') || sortField.includes('date')) {
         aVal = new Date(aVal)
         bVal = new Date(bVal)
       }
-      
+
       // Handle string fields - ensure both are strings before toLowerCase
       if (typeof aVal === 'string' && typeof bVal === 'string') {
         aVal = aVal.toLowerCase()
@@ -133,7 +133,7 @@ function filterAndSearch(data, params) {
         aVal = String(aVal).toLowerCase()
         bVal = bVal.toLowerCase()
       }
-      
+
       if (aVal < bVal) return -1 * sortOrder
       if (aVal > bVal) return 1 * sortOrder
       return 0
@@ -156,7 +156,7 @@ function filterAndSearch(data, params) {
       return new Date(b.created_at) - new Date(a.created_at)
     })
   }
-  
+
   return filtered
 }
 
@@ -165,7 +165,7 @@ export const handlers = [
   http.get('/api/jobs', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 10
@@ -174,18 +174,18 @@ export const handlers = [
     const status = url.searchParams.get('status') || ''
     const sort_by = url.searchParams.get('sort_by') || 'created_at'
     const sort_order = url.searchParams.get('sort_order') || 'desc'
-    
+
     const jobs = await db.jobs.toArray()
     const filtered = filterAndSearch(jobs, { search, department, status, sort_by, sort_order })
     const result = paginate(filtered, page, limit)
-    
+
     return HttpResponse.json(result)
   }),
-  
+
   http.get('/api/jobs/stats', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobs = await db.jobs.toArray()
     const stats = {
       total: jobs.length,
@@ -195,27 +195,27 @@ export const handlers = [
       archived: jobs.filter(j => j.status === 'archived').length,
       recent: jobs.filter(j => new Date(j.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length
     }
-    
+
     return HttpResponse.json(stats)
   }),
-  
+
   http.get('/api/jobs/departments', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobs = await db.jobs.toArray()
     const departments = [...new Set(jobs.map(j => j.department))].sort()
-    
+
     return HttpResponse.json(departments)
   }),
-  
+
   http.get('/api/jobs/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const idOrSlug = params.id
     let job
-    
+
     // Check if it's a numeric ID or a slug
     if (/^\d+$/.test(idOrSlug)) {
       // It's a numeric ID
@@ -225,32 +225,32 @@ export const handlers = [
       const jobs = await db.jobs.toArray()
       job = jobs.find(j => j.slug === idOrSlug)
     }
-    
+
     if (!job) {
       return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    
+
     return HttpResponse.json(job)
   }),
-  
+
   http.get('/api/jobs/slug/:slug', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobs = await db.jobs.toArray()
     const job = jobs.find(j => j.slug === params.slug)
-    
+
     if (!job) {
       return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    
+
     return HttpResponse.json(job)
   }),
-  
+
   http.post('/api/jobs', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobData = await request.json()
     const newJob = {
       ...jobData,
@@ -259,18 +259,18 @@ export const handlers = [
       updated_at: new Date(),
       slug: jobData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now()
     }
-    
+
     await db.jobs.add(newJob)
     return HttpResponse.json(newJob, { status: 201 })
   }),
-  
+
   http.put('/api/jobs/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobData = await request.json()
     const identifier = params.id
-    
+
     // Try to find job by ID (numeric) or slug
     let existingJob
     const numericId = parseInt(identifier)
@@ -280,17 +280,17 @@ export const handlers = [
       // Find by slug
       existingJob = await db.jobs.where('slug').equals(identifier).first()
     }
-    
+
     if (!existingJob) {
       return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    
+
     const updatedJob = {
       ...jobData,
       id: existingJob.id,
       updated_at: new Date()
     }
-    
+
     await db.jobs.update(existingJob.id, updatedJob)
     const job = await db.jobs.get(existingJob.id)
     return HttpResponse.json(job)
@@ -299,10 +299,10 @@ export const handlers = [
   http.patch('/api/jobs/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobData = await request.json()
     const identifier = params.id
-    
+
     // Try to find job by ID (numeric) or slug
     let job
     const numericId = parseInt(identifier)
@@ -312,34 +312,45 @@ export const handlers = [
       // Find by slug
       job = await db.jobs.where('slug').equals(identifier).first()
     }
-    
+
     if (!job) {
       return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    
-    const updatedData = {
-      ...jobData,
-      updated_at: new Date()
+
+    // Merge patch data with the existing record (true PATCH semantics)
+    const merged = { ...job, ...jobData }
+    // Ensure department defaults to existing if omitted
+    if (merged.department == null || merged.department === '') {
+      merged.department = job.department
     }
-    
-    await db.jobs.update(job.id, updatedData)
+
+    // If title changes and slug not explicitly provided, regenerate slug
+    if (jobData.title && !jobData.slug) {
+      const slugBase = jobData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      merged.slug = `${slugBase}-${job.id}`
+    }
+
+    merged.id = job.id
+    merged.updated_at = new Date()
+
+    await db.jobs.update(job.id, merged)
     const updatedJob = await db.jobs.get(job.id)
     return HttpResponse.json(updatedJob)
   }),
-  
+
   http.delete('/api/jobs/:id', async ({ params }) => {
     console.log(`DELETE job handler called for: ${params.id}`)
-    
+
     const networkError = await handleNetworkSimulation()
     if (networkError) {
       console.log('Network simulation error in job DELETE handler')
       return networkError
     }
-    
+
     try {
       const identifier = params.id
       console.log(`Looking for job to delete with identifier: ${identifier}`)
-      
+
       // Try to find job by ID (numeric) or slug
       let job
       const numericId = parseInt(identifier)
@@ -351,16 +362,16 @@ export const handlers = [
         // Find by slug
         job = await db.jobs.where('slug').equals(identifier).first()
       }
-      
+
       if (!job) {
         console.log(`Job not found: ${identifier}`)
         return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
       }
-      
+
       console.log(`Found job to delete: ${job.title} (ID: ${job.id})`)
       await db.jobs.delete(job.id)
       console.log(`Successfully deleted job ${job.id}`)
-      
+
       return HttpResponse.json({ success: true })
     } catch (error) {
       console.error('Error in job DELETE handler:', error)
@@ -373,15 +384,15 @@ export const handlers = [
   http.patch('/api/jobs/:id/reorder', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     // Occasionally return 500 to test rollback as specified
     if (Math.random() < 0.1) {
       return HttpResponse.json({ error: 'Reorder failed' }, { status: 500 })
     }
-    
+
     const { fromOrder, toOrder } = await request.json()
     const identifier = params.id
-    
+
     // Find job by ID or slug
     let job
     const numericId = parseInt(identifier)
@@ -390,30 +401,30 @@ export const handlers = [
     } else {
       job = await db.jobs.where('slug').equals(identifier).first()
     }
-    
+
     if (!job) {
       return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    
+
     // Update job order
     await db.jobs.update(job.id, { order: toOrder })
-    
+
     return HttpResponse.json({ success: true, fromOrder, toOrder })
   }),
-  
+
   http.post('/api/jobs/reorder', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const { jobs } = await request.json()
     console.log('Reordering jobs:', jobs.map(j => ({ id: j.id, title: j.title })))
-    
+
     // Update the order in database
     for (const [index, job] of jobs.entries()) {
       await db.jobs.update(job.id, { order: index, updated_at: new Date() })
       console.log(`Updated job ${job.id} (${job.title}) to order ${index}`)
     }
-    
+
     return HttpResponse.json({ success: true })
   }),
 
@@ -421,7 +432,7 @@ export const handlers = [
   http.get('/api/candidates', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 50
@@ -433,9 +444,9 @@ export const handlers = [
     const sort_by = url.searchParams.get('sort_by') || 'created_at'
     const sort_order = url.searchParams.get('sort_order') || 'desc'
     const jobId = url.searchParams.get('jobId')
-    
+
     let candidates = await db.candidates.toArray()
-    
+
     // If jobId is provided, filter candidates by applications to that job
     if (jobId) {
       const applications = await db.applications.toArray()
@@ -443,17 +454,17 @@ export const handlers = [
       const candidateIds = jobApplications.map(app => app.candidate_id)
       candidates = candidates.filter(candidate => candidateIds.includes(candidate.id))
     }
-    
+
     const filtered = filterAndSearch(candidates, { search, position, stage, location, experience, sort_by, sort_order })
     const result = paginate(filtered, page, limit)
-    
+
     return HttpResponse.json(result)
   }),
-  
+
   http.get('/api/candidates/stats', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidates = await db.candidates.toArray()
     const stats = {
       total: candidates.length,
@@ -465,61 +476,60 @@ export const handlers = [
       hired: candidates.filter(c => c.stage === 'hired').length,
       rejected: candidates.filter(c => c.stage === 'rejected').length
     }
-    
+
     return HttpResponse.json(stats)
   }),
-  
+
   http.get('/api/candidates/positions', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidates = await db.candidates.toArray()
     const positions = [...new Set(candidates.map(c => c.position))].sort()
-    
+
     return HttpResponse.json(positions)
   }),
-  
+
   http.get('/api/candidates/locations', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidates = await db.candidates.toArray()
     const locations = [...new Set(candidates.map(c => c.location))].sort()
-    
+
     return HttpResponse.json(locations)
   }),
-  
+
   http.get('/api/candidates/by-stage', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidates = await db.candidates.toArray()
     const byStage = {
       applied: candidates.filter(c => c.stage === 'applied'),
-      review: candidates.filter(c => c.stage === 'review'),
-      interview: candidates.filter(c => c.stage === 'interview'),
-      assessment: candidates.filter(c => c.stage === 'assessment'),
+      screen: candidates.filter(c => c.stage === 'screen'),
+      test: candidates.filter(c => c.stage === 'test'),
       offer: candidates.filter(c => c.stage === 'offer'),
       hired: candidates.filter(c => c.stage === 'hired'),
       rejected: candidates.filter(c => c.stage === 'rejected')
     }
-    
+
     return HttpResponse.json(byStage)
   }),
-  
+
   http.get('/api/candidates/:id', async ({ params }) => {
     console.log(`GET candidate handler called for: ${params.id}`)
-    
+
     const networkError = await handleNetworkSimulation()
     if (networkError) {
       console.log('Network simulation error in candidate GET handler')
       return networkError
     }
-    
+
     try {
       const identifier = params.id
       let candidate
-      
+
       // Try to find candidate by ID (numeric) or slug
       const numericId = parseInt(identifier)
       if (!isNaN(numericId)) {
@@ -530,12 +540,12 @@ export const handlers = [
         // Find by slug
         candidate = await db.candidates.where('slug').equals(identifier).first()
       }
-      
+
       if (!candidate) {
         console.log(`Candidate not found: ${identifier}`)
         return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 })
       }
-      
+
       console.log(`Candidate found: ${candidate.name} (ID: ${candidate.id})`)
       return HttpResponse.json(candidate)
     } catch (error) {
@@ -544,72 +554,134 @@ export const handlers = [
       return HttpResponse.json({ error: 'Failed to fetch candidate' }, { status: 500 })
     }
   }),
-  
+
   http.post('/api/candidates', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidateData = await request.json()
+    const now = new Date()
+    const initialStage = (candidateData.stage || 'applied')
     const newCandidate = {
       ...candidateData,
       id: Date.now(),
-      created_at: new Date(),
-      updated_at: new Date()
+      created_at: now,
+      updated_at: now,
+      stage: initialStage,
+      // Ensure timeline starts with the chosen initial stage
+      stage_history: [
+        {
+          stage: initialStage,
+          date: now.toISOString(),
+          notes: `Created with initial stage ${initialStage}`
+        }
+      ]
     }
-    
+
     await db.candidates.add(newCandidate)
     return HttpResponse.json(newCandidate, { status: 201 })
   }),
-  
+
   http.put('/api/candidates/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidateData = await request.json()
     const id = parseInt(params.id)
-    
-    const updatedCandidate = {
+
+    /*const updatedCandidate = {
       ...candidateData,
       id,
       updated_at: new Date()
     }
-    
+
     await db.candidates.update(id, updatedCandidate)
     const candidate = await db.candidates.get(id)
-    return HttpResponse.json(candidate)
+    return HttpResponse.json(candidate)*/
+
+    const existingCandidate = await db.candidates.get(id);
+    if (!existingCandidate) {
+      return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 });
+    }
+
+    const updatedData = {
+      ...existingCandidate, // Preserve existing fields like created_at
+      ...candidateData,     // Overwrite with new form data
+      id,                   // Ensure ID is correct
+      updated_at: new Date()
+    };
+
+    // Check if the stage has changed and update the history array
+    if (candidateData.stage && candidateData.stage !== existingCandidate.stage) {
+      const history = Array.isArray(existingCandidate.stage_history)
+        ? [...existingCandidate.stage_history]
+        : [];
+
+      history.push({
+        stage: candidateData.stage,
+        date: new Date().toISOString(),
+        notes: `Stage updated via Edit Form to ${candidateData.stage}`
+      });
+      updatedData.stage_history = history;
+    }
+
+    await db.candidates.update(id, updatedData);
+    const candidate = await db.candidates.get(id);
+    return HttpResponse.json(candidate);
   }),
 
   http.patch('/api/candidates/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidateData = await request.json()
     const id = parseInt(params.id)
-    
-    await db.candidates.update(id, { 
+
+    /*await db.candidates.update(id, {
       ...candidateData,
-      updated_at: new Date() 
-    })
-    
+      updated_at: new Date()
+    })*/
+    const existingCandidate = await db.candidates.get(id);
+    if (!existingCandidate) {
+      return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 });
+    }
+
+    const updatedData = {
+      ...candidateData,
+      updated_at: new Date()
+    };
+
+    // Check if stage has changed and update history
+    if (candidateData.stage && candidateData.stage !== existingCandidate.stage) {
+      const history = Array.isArray(existingCandidate.stage_history) ? [...existingCandidate.stage_history] : [];
+      history.push({
+        stage: candidateData.stage,
+        date: new Date().toISOString(),
+        notes: `Stage updated to ${candidateData.stage}`
+      });
+      updatedData.stage_history = history;
+    }
+
+    await db.candidates.update(id, updatedData);
     const candidate = await db.candidates.get(id)
     return HttpResponse.json(candidate)
   }),
 
   http.get('/api/candidates/:id/notes', async ({ params }) => {
     console.log(`Notes handler called for candidate: ${params.id}`)
-    
+
     const networkError = await handleNetworkSimulation()
     if (networkError) {
       console.log('Network simulation error in notes handler')
       return networkError
     }
-    
+
     try {
       const identifier = params.id
       console.log(`Looking for candidate with identifier: ${identifier}`)
-      
+
       let candidate
-      
+
       // Try to find candidate by ID (numeric) or slug
       const numericId = parseInt(identifier)
       if (!isNaN(numericId)) {
@@ -620,15 +692,15 @@ export const handlers = [
         // Find by slug
         candidate = await db.candidates.where('slug').equals(identifier).first()
       }
-      
+
       console.log(`Candidate found:`, candidate ? `ID ${candidate.id}` : 'Not found')
-      
+
       if (!candidate) {
         // Still return empty notes array even if candidate doesn't exist
         console.log(`Notes requested for non-existent candidate ${identifier}`)
         return HttpResponse.json([])
       }
-      
+
       // Get notes from candidate record (stored as JSON array) or return empty array
       let notes = []
       if (candidate.notes) {
@@ -642,7 +714,7 @@ export const handlers = [
           notes = []
         }
       }
-      
+
       // If no notes exist, add some default mock notes for demonstration
       if (notes.length === 0) {
         notes = [
@@ -661,13 +733,13 @@ export const handlers = [
             createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() // 1 day ago
           }
         ]
-        
+
         // Save these default notes back to the candidate
-        await db.candidates.update(candidate.id, { 
-          notes: JSON.stringify(notes) 
+        await db.candidates.update(candidate.id, {
+          notes: JSON.stringify(notes)
         })
       }
-      
+
       console.log(`Returning ${notes.length} notes for candidate ${candidate.id}`)
       return HttpResponse.json(notes)
     } catch (error) {
@@ -679,29 +751,29 @@ export const handlers = [
 
   http.post('/api/candidates/:id/notes', async ({ params, request }) => {
     console.log(`POST notes handler called for candidate: ${params.id}`)
-    
+
     const networkError = await handleNetworkSimulation()
     if (networkError) {
       console.log('Network simulation error in POST notes handler')
       return networkError
     }
-    
+
     try {
       const noteData = await request.json()
       console.log('Note data received:', noteData)
-      
+
       const candidateId = parseInt(params.id)
       console.log(`Looking for candidate with ID: ${candidateId}`)
-      
+
       // Find the candidate
       const candidate = await db.candidates.get(candidateId)
       if (!candidate) {
         console.log(`Candidate ${candidateId} not found`)
         return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 })
       }
-      
+
       console.log(`Candidate found:`, candidate.name)
-      
+
       // Get existing notes
       let existingNotes = []
       if (candidate.notes) {
@@ -718,7 +790,7 @@ export const handlers = [
       } else {
         console.log('No existing notes found')
       }
-      
+
       // Create new note
       const newNote = {
         id: Date.now(),
@@ -727,19 +799,19 @@ export const handlers = [
         author: noteData.author || 'Current User',
         createdAt: new Date().toISOString()
       }
-      
+
       console.log('Created new note:', newNote)
-      
+
       // Add new note to existing notes
       const updatedNotes = [newNote, ...existingNotes]
       console.log(`Total notes after adding: ${updatedNotes.length}`)
-      
+
       // Save back to database
       console.log('Saving notes to database...')
       await db.candidates.update(candidateId, {
         notes: JSON.stringify(updatedNotes)
       })
-      
+
       console.log(`Successfully added note to candidate ${candidateId}. Total notes: ${updatedNotes.length}`)
       return HttpResponse.json(newNote, { status: 201 })
     } catch (error) {
@@ -753,14 +825,14 @@ export const handlers = [
   http.get('/api/candidates/:id/timeline', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const candidateId = parseInt(params.id)
     const candidate = await db.candidates.get(candidateId)
-    
+
     if (!candidate) {
       return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 })
     }
-    
+
     // Generate mock timeline events
     const timeline = [
       {
@@ -796,47 +868,71 @@ export const handlers = [
         stage: 'tech'
       }
     ]
-    
+
     return HttpResponse.json(timeline)
   }),
-  
+
   http.put('/api/candidates/:id/stage', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const { stage, notes } = await request.json()
     const id = parseInt(params.id)
-    
-    await db.candidates.update(id, { 
-      stage, 
-      notes: notes || '', 
-      updated_at: new Date() 
-    })
-    
+
+    /*await db.candidates.update(id, {
+      stage,
+      notes: notes || '',
+      updated_at: new Date()
+    })*/
+
+    // START MODIFICATION
+    const existingCandidate = await db.candidates.get(id);
+    if (!existingCandidate) {
+      return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 });
+    }
+
+    const updatedData = {
+      stage,
+      notes: notes || existingCandidate.notes || '',
+      updated_at: new Date()
+    };
+
+    // Update history
+    const history = Array.isArray(existingCandidate.stage_history) ? [...existingCandidate.stage_history] : [];
+    history.push({
+      stage: stage,
+      date: new Date().toISOString(),
+      notes: `Stage updated via Kanban/Action`
+    });
+    updatedData.stage_history = history;
+
+    await db.candidates.update(id, updatedData);
+    // END MODIFICATION
+
     const candidate = await db.candidates.get(id)
     return HttpResponse.json(candidate)
   }),
-  
+
   http.put('/api/candidates/bulk', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const { updates } = await request.json()
-    
+
     for (const update of updates) {
-      await db.candidates.update(update.id, { 
-        ...update, 
-        updated_at: new Date() 
+      await db.candidates.update(update.id, {
+        ...update,
+        updated_at: new Date()
       })
     }
-    
+
     return HttpResponse.json({ success: true })
   }),
-  
+
   http.delete('/api/candidates/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const id = parseInt(params.id)
     await db.candidates.delete(id)
     return HttpResponse.json({ success: true })
@@ -846,7 +942,7 @@ export const handlers = [
   http.get('/api/applications', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 20
@@ -855,18 +951,18 @@ export const handlers = [
     const status = url.searchParams.get('status') || ''
     const sort_by = url.searchParams.get('sort_by') || 'applied_at'
     const sort_order = url.searchParams.get('sort_order') || 'desc'
-    
+
     const applications = await db.applications.toArray()
     const filtered = filterAndSearch(applications, { job_id, candidate_id, status, sort_by, sort_order })
     const result = paginate(filtered, page, limit)
-    
+
     return HttpResponse.json(result)
   }),
-  
+
   http.get('/api/applications/stats', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const applications = await db.applications.toArray()
     const stats = {
       total: applications.length,
@@ -878,26 +974,26 @@ export const handlers = [
       hired: applications.filter(a => a.status === 'hired').length,
       rejected: applications.filter(a => a.status === 'rejected').length
     }
-    
+
     return HttpResponse.json(stats)
   }),
-  
+
   http.get('/api/applications/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const application = await db.applications.get(parseInt(params.id))
     if (!application) {
       return HttpResponse.json({ error: 'Application not found' }, { status: 404 })
     }
-    
+
     return HttpResponse.json(application)
   }),
-  
+
   http.post('/api/applications', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const applicationData = await request.json()
     const newApplication = {
       ...applicationData,
@@ -907,54 +1003,54 @@ export const handlers = [
         { stage: 'applied', date: new Date(), notes: 'Application submitted' }
       ]
     }
-    
+
     await db.applications.add(newApplication)
     return HttpResponse.json(newApplication, { status: 201 })
   }),
-  
+
   http.put('/api/applications/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const applicationData = await request.json()
     const id = parseInt(params.id)
-    
+
     await db.applications.update(id, applicationData)
     const application = await db.applications.get(id)
     return HttpResponse.json(application)
   }),
-  
+
   http.put('/api/applications/:id/status', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const { status, notes } = await request.json()
     const id = parseInt(params.id)
-    
+
     const application = await db.applications.get(id)
     if (!application) {
       return HttpResponse.json({ error: 'Application not found' }, { status: 404 })
     }
-    
+
     const updatedStageHistory = [
       ...application.stage_history,
       { stage: status, date: new Date(), notes: notes || '' }
     ]
-    
-    await db.applications.update(id, { 
-      status, 
-      notes: notes || '', 
-      stage_history: updatedStageHistory 
+
+    await db.applications.update(id, {
+      status,
+      notes: notes || '',
+      stage_history: updatedStageHistory
     })
-    
+
     const updatedApplication = await db.applications.get(id)
     return HttpResponse.json(updatedApplication)
   }),
-  
+
   http.delete('/api/applications/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const id = parseInt(params.id)
     await db.applications.delete(id)
     return HttpResponse.json({ success: true })
@@ -964,52 +1060,52 @@ export const handlers = [
   http.get('/api/assessments', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 10
     const job_id = url.searchParams.get('job_id')
-    
+
     const assessments = await db.assessments.toArray()
     const filtered = filterAndSearch(assessments, { job_id })
     const result = paginate(filtered, page, limit)
-    
+
     return HttpResponse.json(result)
   }),
-  
+
   http.get('/api/assessments/stats', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const assessments = await db.assessments.toArray()
     const responses = await db.assessment_responses.toArray()
-    
+
     const stats = {
       total_assessments: assessments.length,
       total_responses: responses.length,
       completion_rate: responses.length / (assessments.length * 100) * 100, // Rough estimate
       average_score: responses.reduce((sum, r) => sum + (r.score || 0), 0) / responses.length || 0
     }
-    
+
     return HttpResponse.json(stats)
   }),
-  
+
   http.get('/api/assessments/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const assessment = await db.assessments.get(parseInt(params.id))
     if (!assessment) {
       return HttpResponse.json({ error: 'Assessment not found' }, { status: 404 })
     }
-    
+
     return HttpResponse.json(assessment)
   }),
-  
+
   http.post('/api/assessments', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const assessmentData = await request.json()
     const newAssessment = {
       ...assessmentData,
@@ -1017,38 +1113,38 @@ export const handlers = [
       created_at: new Date(),
       updated_at: new Date()
     }
-    
+
     await db.assessments.add(newAssessment)
     return HttpResponse.json(newAssessment, { status: 201 })
   }),
-  
+
   http.put('/api/assessments/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const assessmentData = await request.json()
     const id = parseInt(params.id)
-    
+
     const updatedAssessment = {
       ...assessmentData,
       id,
       updated_at: new Date()
     }
-    
+
     await db.assessments.update(id, updatedAssessment)
     const assessment = await db.assessments.get(id)
     return HttpResponse.json(assessment)
   }),
-  
+
   http.post('/api/assessments/:id/duplicate', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const originalAssessment = await db.assessments.get(parseInt(params.id))
     if (!originalAssessment) {
       return HttpResponse.json({ error: 'Assessment not found' }, { status: 404 })
     }
-    
+
     const duplicatedAssessment = {
       ...originalAssessment,
       id: Date.now(),
@@ -1056,15 +1152,15 @@ export const handlers = [
       created_at: new Date(),
       updated_at: new Date()
     }
-    
+
     await db.assessments.add(duplicatedAssessment)
     return HttpResponse.json(duplicatedAssessment, { status: 201 })
   }),
-  
+
   http.delete('/api/assessments/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const id = parseInt(params.id)
     await db.assessments.delete(id)
     return HttpResponse.json({ success: true })
@@ -1074,25 +1170,25 @@ export const handlers = [
   http.get('/api/assessments/:jobId', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobId = parseInt(params.jobId)
-    
+
     // Find assessments for this specific job
     const assessments = await db.assessments.where('job_id').equals(jobId).toArray()
-    
+
     return HttpResponse.json(assessments)
   }),
 
   http.put('/api/assessments/:jobId', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobId = parseInt(params.jobId)
     const assessmentData = await request.json()
-    
+
     // Find existing assessment for this job or create new one
     let assessment = await db.assessments.where('job_id').equals(jobId).first()
-    
+
     if (assessment) {
       // Update existing assessment
       await db.assessments.update(assessment.id, {
@@ -1112,17 +1208,17 @@ export const handlers = [
       await db.assessments.add(newAssessment)
       assessment = newAssessment
     }
-    
+
     return HttpResponse.json(assessment)
   }),
 
   http.post('/api/assessments/:jobId/submit', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const jobId = parseInt(params.jobId)
     const responseData = await request.json()
-    
+
     // Create assessment response and store locally
     const response = {
       id: Date.now(),
@@ -1134,10 +1230,10 @@ export const handlers = [
       submitted_at: new Date(),
       status: 'submitted'
     }
-    
+
     // Store in IndexedDB for local persistence
     await db.assessment_responses.add(response)
-    
+
     return HttpResponse.json(response, { status: 201 })
   }),
 
@@ -1145,54 +1241,54 @@ export const handlers = [
   http.get('/api/assessment-responses', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 20
     const assessment_id = url.searchParams.get('assessment_id')
     const candidate_id = url.searchParams.get('candidate_id')
-    
+
     const responses = await db.assessment_responses.toArray()
     const filtered = filterAndSearch(responses, { assessment_id, candidate_id })
     const result = paginate(filtered, page, limit)
-    
+
     return HttpResponse.json(result)
   }),
-  
+
   http.get('/api/assessment-responses/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const response = await db.assessment_responses.get(parseInt(params.id))
     if (!response) {
       return HttpResponse.json({ error: 'Assessment response not found' }, { status: 404 })
     }
-    
+
     return HttpResponse.json(response)
   }),
-  
+
   http.post('/api/assessment-responses', async ({ request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const responseData = await request.json()
     const newResponse = {
       ...responseData,
       id: Date.now(),
       completed_at: new Date()
     }
-    
+
     await db.assessment_responses.add(newResponse)
     return HttpResponse.json(newResponse, { status: 201 })
   }),
-  
+
   http.put('/api/assessment-responses/:id', async ({ params, request }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const responseData = await request.json()
     const id = parseInt(params.id)
-    
+
     await db.assessment_responses.update(id, responseData)
     const response = await db.assessment_responses.get(id)
     return HttpResponse.json(response)
@@ -1202,15 +1298,15 @@ export const handlers = [
   http.get('/api/stats', async () => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
-    
+
     const totalJobs = await db.jobs.count()
     const activeJobs = await db.jobs.where('status').equals('active').count()
     const totalCandidates = await db.candidates.count()
     const totalAssessments = await db.assessments.count()
-    
+
     // Calculate hire rate (mock calculation)
     const hireRate = Math.round((activeJobs / totalJobs) * 100) || 0
-    
+
     return HttpResponse.json({
       activeJobs,
       totalCandidates,

@@ -132,9 +132,14 @@ export function useUpdateJob() {
       // Update specific job in cache
       queryClient.setQueryData(['jobs', updatedJob.id], updatedJob)
       queryClient.setQueryData(['jobs', 'slug', updatedJob.slug], updatedJob)
+      // Also sync detail caches by id and slug so navigation shows fresh data immediately
+      queryClient.setQueryData(['job', String(updatedJob.id)], updatedJob)
+      queryClient.setQueryData(['job', updatedJob.slug], updatedJob)
 
       // Invalidate jobs list to ensure consistency
       queryClient.invalidateQueries({ queryKey: ['jobs'], exact: false })
+      // Invalidate any job detail queries (by id or slug)
+      queryClient.invalidateQueries({ queryKey: ['job'], exact: false })
     }
   })
 }
