@@ -2,9 +2,10 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import React, { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Briefcase, Users, FileText, Home, Settings } from 'lucide-react'
+import { Briefcase, Users, FileText, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/stores/theme'
+import { SettingsMenu } from '@/components/settings-menu'
 
 const navigation = [
   { name: 'Dashboard', href: '/app', icon: Home },
@@ -80,19 +81,17 @@ export function AppLayout() {
         {/* Top bar */}
         <header className="flex h-16 items-center justify-between px-6 border-b border-white/20 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-lg shadow-2xl">
           <h1 className="text-lg font-semibold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-            {navigation.find(nav => location.pathname === nav.href || 
-              (nav.href !== '/app' && location.pathname.startsWith(nav.href)))?.name || 'Dashboard'}
+            {
+              // Override title for job assessments route
+              location.pathname.match(/^\/app\/jobs\/.+\/assessments/) ? 'Assessments'
+              : (navigation.find(nav => location.pathname === nav.href || 
+                (nav.href !== '/app' && location.pathname.startsWith(nav.href)))?.name || 'Dashboard')
+            }
           </h1>
           
           <div className="flex items-center space-x-4">
             <ThemeToggle />
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="bg-white/10 border border-white/20 text-white hover:bg-white/20 rounded-xl"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            <SettingsMenu />
           </div>
         </header>
 

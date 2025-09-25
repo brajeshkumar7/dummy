@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
@@ -35,6 +35,7 @@ import {
   useUpdateAssessment,
   useDeleteAssessment
 } from '@/hooks/useApplications'
+import { useJobAssessment, useUpsertJobAssessment, useCreateJobAssessment } from '@/hooks/useApplications'
 import {
   PlusIcon,
   GripVerticalIcon,
@@ -58,7 +59,10 @@ import {
   SlidersHorizontalIcon,
   BarChart3Icon,
   FileIcon,
-  CodeIcon
+  CodeIcon,
+  ArrowLeftIcon,
+  UserIcon,
+  BriefcaseIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -201,7 +205,7 @@ function DraggableQuestion({ question, index, onEdit, onDelete, onDuplicate }) {
             >
               <GripVerticalIcon className="h-4 w-4" />
             </Button>
-            
+
             <div className="flex items-center gap-2">
               <Badge className={questionType.color}>
                 <questionType.icon className="h-3 w-3 mr-1" />
@@ -210,7 +214,7 @@ function DraggableQuestion({ question, index, onEdit, onDelete, onDuplicate }) {
               <span className="text-sm text-muted-foreground">Question {index + 1}</span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -236,16 +240,16 @@ function DraggableQuestion({ question, index, onEdit, onDelete, onDuplicate }) {
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <h3 className="font-medium mb-2">{question.question}</h3>
-        
+
         {question.description && (
           <p className="text-sm text-muted-foreground mb-3">{question.description}</p>
         )}
-        
+
         <QuestionPreview question={question} />
-        
+
         <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
           {question.required && (
             <span className="flex items-center gap-1">
@@ -325,19 +329,19 @@ function QuestionPreview({ question }) {
 
     case 'short_answer':
       return (
-        <Input 
-          placeholder="Short answer..." 
-          className="max-w-md" 
-          disabled 
+        <Input
+          placeholder="Short answer..."
+          className="max-w-md"
+          disabled
         />
       )
 
     case 'essay':
       return (
-        <Textarea 
-          placeholder="Essay response..." 
-          rows={3} 
-          disabled 
+        <Textarea
+          placeholder="Essay response..."
+          rows={3}
+          disabled
         />
       )
 
@@ -517,7 +521,7 @@ function QuestionForm({ question, availableQuestions, onSave, onCancel }) {
       <Separator />
       <div className="space-y-4">
         <h3 className="font-medium">Question Configuration</h3>
-        
+
         {(formData.type === 'multiple_choice' || formData.type === 'multiple_select') && (
           <div className="space-y-3">
             <Label>Options</Label>
@@ -556,7 +560,7 @@ function QuestionForm({ question, availableQuestions, onSave, onCancel }) {
               <PlusIcon className="h-4 w-4 mr-2" />
               Add Option
             </Button>
-            
+
             {formData.type === 'multiple_choice' && (
               <div>
                 <Label>Correct Answer</Label>
@@ -708,7 +712,7 @@ function QuestionForm({ question, availableQuestions, onSave, onCancel }) {
       <Separator />
       <div className="space-y-4">
         <h3 className="font-medium">Settings</h3>
-        
+
         <div className="grid grid-cols-3 gap-4">
           <div className="flex items-center space-x-2">
             <Switch
@@ -718,7 +722,7 @@ function QuestionForm({ question, availableQuestions, onSave, onCancel }) {
             />
             <Label htmlFor="required">Required</Label>
           </div>
-          
+
           <div>
             <Label htmlFor="points">Points</Label>
             <Input
@@ -729,7 +733,7 @@ function QuestionForm({ question, availableQuestions, onSave, onCancel }) {
               min="0"
             />
           </div>
-          
+
           <div>
             <Label htmlFor="time_limit">Time Limit (minutes)</Label>
             <Input
@@ -786,7 +790,7 @@ function QuestionForm({ question, availableQuestions, onSave, onCancel }) {
                     </SelectContent>
                   </Select>
                 )}
-                
+
                 <Select
                   value={condition.questionId}
                   onValueChange={(value) => handleUpdateCondition(condition.id, { questionId: value })}
@@ -875,7 +879,7 @@ function AssessmentPreview({ assessment }) {
 
     const results = conditions.map(condition => {
       const questionAnswer = answers[condition.questionId]
-      
+
       switch (condition.operator) {
         case 'equals':
           return questionAnswer === condition.value
@@ -899,7 +903,7 @@ function AssessmentPreview({ assessment }) {
     // Apply logic operators (AND/OR)
     return conditions.reduce((acc, condition, index) => {
       if (index === 0) return results[index]
-      
+
       if (condition.logicOperator === 'OR') {
         return acc || results[index]
       } else {
@@ -910,7 +914,7 @@ function AssessmentPreview({ assessment }) {
 
   // Filter questions based on conditions
   const visibleQuestions = useMemo(() => {
-    return assessment.questions.filter(question => 
+    return assessment.questions.filter(question =>
       evaluateConditions(question.conditions, answers)
     )
   }, [assessment.questions, answers])
@@ -1031,11 +1035,11 @@ function AssessmentPreview({ assessment }) {
               )}
             </div>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="w-full bg-secondary rounded-full h-2 mt-4">
-            <div 
-              className="bg-primary h-2 rounded-full transition-all duration-300" 
+            <div
+              className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
             />
           </div>
@@ -1075,9 +1079,9 @@ function AssessmentPreview({ assessment }) {
             )}
           </div>
         </CardHeader>
-        
+
         <CardContent>
-          <InteractiveQuestionPreview 
+          <InteractiveQuestionPreview
             question={currentQuestion}
             answer={answers[currentQuestion.id]}
             onAnswerChange={(answer) => handleAnswerChange(currentQuestion.id, answer)}
@@ -1094,7 +1098,7 @@ function AssessmentPreview({ assessment }) {
         >
           Previous
         </Button>
-        
+
         <div className="flex items-center gap-2">
           {visibleQuestions.map((_, index) => (
             <Button
@@ -1145,7 +1149,7 @@ function InteractiveQuestionPreview({ question, answer, onAnswerChange }) {
         <div className="space-y-2">
           {data.options.map((option, index) => (
             <div key={index} className="flex items-center space-x-2">
-              <Checkbox 
+              <Checkbox
                 checked={answer?.includes(index)}
                 onCheckedChange={(checked) => {
                   const currentAnswers = answer || []
@@ -1178,7 +1182,7 @@ function InteractiveQuestionPreview({ question, answer, onAnswerChange }) {
 
     case 'short_answer':
       return (
-        <Input 
+        <Input
           value={answer || ''}
           onChange={(e) => onAnswerChange(e.target.value)}
           placeholder="Enter your answer..."
@@ -1189,7 +1193,7 @@ function InteractiveQuestionPreview({ question, answer, onAnswerChange }) {
     case 'essay':
       return (
         <div className="space-y-2">
-          <Textarea 
+          <Textarea
             value={answer || ''}
             onChange={(e) => onAnswerChange(e.target.value)}
             placeholder="Write your essay response..."
@@ -1209,9 +1213,9 @@ function InteractiveQuestionPreview({ question, answer, onAnswerChange }) {
           {Array.from({ length: data.max_value - data.min_value + 1 }, (_, i) => {
             const value = data.min_value + i
             return (
-              <Button 
-                key={i} 
-                variant={answer == value ? "default" : "outline"} 
+              <Button
+                key={i}
+                variant={answer == value ? "default" : "outline"}
                 size="sm"
                 onClick={() => onAnswerChange(value)}
               >
@@ -1271,7 +1275,7 @@ function InteractiveQuestionPreview({ question, answer, onAnswerChange }) {
             <strong>Instructions:</strong> Complete the function below
           </div>
           <div className="bg-gray-950 text-green-400 p-4 rounded font-mono text-sm min-h-[200px]">
-            <textarea 
+            <textarea
               className="w-full h-full bg-transparent border-none outline-none resize-none text-green-400 font-mono"
               value={answer || data.starter_code}
               onChange={(e) => onAnswerChange(e.target.value)}
@@ -1291,7 +1295,8 @@ function InteractiveQuestionPreview({ question, answer, onAnswerChange }) {
 
 export function AssessmentBuilderPage() {
   const navigate = useNavigate()
-  
+  const { jobId } = useParams()
+
   // State
   const [assessment, setAssessment] = useState({
     title: '',
@@ -1310,7 +1315,7 @@ export function AssessmentBuilderPage() {
       }
     ]
   })
-  
+
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState(null)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
@@ -1319,7 +1324,9 @@ export function AssessmentBuilderPage() {
   const [activeSectionId, setActiveSectionId] = useState(null)
 
   // API calls
-  const createAssessmentMutation = useCreateAssessment()
+  const { data: existingJobAssessment } = useJobAssessment(jobId)
+  const upsertJobAssessment = useUpsertJobAssessment()
+  const createJobAssessment = useCreateJobAssessment()
 
   // Set default active section
   React.useEffect(() => {
@@ -1327,6 +1334,10 @@ export function AssessmentBuilderPage() {
       setActiveSectionId(assessment.sections[0].id)
     }
   }, [assessment.sections, activeSectionId])
+
+  // Hydrate from existing job assessment
+  // When entering builder, start fresh for new assessment; do not auto-hydrate from existing
+  // Users can switch to preview to see current content before saving.
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -1357,7 +1368,7 @@ export function AssessmentBuilderPage() {
         const section = newSections[sectionIndex]
         const oldIndex = section.questions.findIndex(q => q.id === active.id)
         const newIndex = section.questions.findIndex(q => q.id === over.id)
-        
+
         if (oldIndex !== -1 && newIndex !== -1) {
           section.questions = arrayMove(section.questions, oldIndex, newIndex)
         }
@@ -1377,12 +1388,12 @@ export function AssessmentBuilderPage() {
       description: sectionData.description,
       questions: []
     }
-    
+
     setAssessment(prev => ({
       ...prev,
       sections: [...prev.sections, newSection]
     }))
-    
+
     setActiveSectionId(newSection.id)
     setIsSectionDialogOpen(false)
   }
@@ -1390,13 +1401,13 @@ export function AssessmentBuilderPage() {
   const handleEditSection = (sectionData) => {
     setAssessment(prev => ({
       ...prev,
-      sections: prev.sections.map(section => 
+      sections: prev.sections.map(section =>
         section.id === editingSection.id
           ? { ...section, title: sectionData.title, description: sectionData.description }
           : section
       )
     }))
-    
+
     setEditingSection(null)
     setIsSectionDialogOpen(false)
   }
@@ -1406,12 +1417,12 @@ export function AssessmentBuilderPage() {
       alert('Cannot delete the last section')
       return
     }
-    
+
     setAssessment(prev => ({
       ...prev,
       sections: prev.sections.filter(s => s.id !== sectionId)
     }))
-    
+
     if (activeSectionId === sectionId) {
       setActiveSectionId(assessment.sections.find(s => s.id !== sectionId)?.id)
     }
@@ -1423,16 +1434,16 @@ export function AssessmentBuilderPage() {
       ...questionData,
       conditions: questionData.conditions || [] // Add conditional logic support
     }
-    
+
     setAssessment(prev => ({
       ...prev,
-      sections: prev.sections.map(section => 
+      sections: prev.sections.map(section =>
         section.id === activeSectionId
           ? { ...section, questions: [...section.questions, newQuestion] }
           : section
       )
     }))
-    
+
     setIsQuestionDialogOpen(false)
   }
 
@@ -1441,12 +1452,12 @@ export function AssessmentBuilderPage() {
       ...prev,
       sections: prev.sections.map(section => ({
         ...section,
-        questions: section.questions.map(q => 
+        questions: section.questions.map(q =>
           q.id === editingQuestion.id ? { ...editingQuestion, ...questionData } : q
         )
       }))
     }))
-    
+
     setEditingQuestion(null)
   }
 
@@ -1468,10 +1479,10 @@ export function AssessmentBuilderPage() {
       id: Date.now().toString(),
       question: `${question.question} (Copy)`
     }
-    
+
     setAssessment(prev => ({
       ...prev,
-      sections: prev.sections.map(section => 
+      sections: prev.sections.map(section =>
         section.id === activeSectionId
           ? { ...section, questions: [...section.questions, duplicatedQuestion] }
           : section
@@ -1492,8 +1503,16 @@ export function AssessmentBuilderPage() {
     }
 
     try {
-      await createAssessmentMutation.mutateAsync(flatAssessment)
-      navigate('/app/assessments')
+      if (jobId) {
+        // Create a new assessment for this job instead of overwriting existing
+        await createJobAssessment.mutateAsync({ jobId, assessment: flatAssessment })
+        navigate(`/app/jobs/${jobId}/assessments`)
+      } else {
+        // fallback to generic create if no job context
+        const createAssessmentMutation = useCreateAssessment()
+        await createAssessmentMutation.mutateAsync(flatAssessment)
+        navigate('/app/assessments')
+      }
     } catch (error) {
       console.error('Failed to save assessment:', error)
     }
@@ -1510,10 +1529,10 @@ export function AssessmentBuilderPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
         <div className="absolute top-40 left-40 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
       </div>
-      
+
       {/* Grid pattern overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-      
+
       <div className="relative z-20 space-y-6 p-6 lg:p-8">
         <div className="flex items-center justify-between">
           <div>
@@ -1522,11 +1541,22 @@ export function AssessmentBuilderPage() {
                 Assessment Builder
               </span>
             </h1>
-            <p className="text-gray-300 text-lg lg:text-xl">
+            <p className="text-gray-300 text-lg lg:text-xl mb-4">
               Create comprehensive assessments with 10 different question types
             </p>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl backdrop-blur-sm transition-all duration-200"
+            >
+              <Link to={`/app/jobs/${jobId}`}>
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Back to Job Details
+              </Link>
+            </Button>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -1536,9 +1566,9 @@ export function AssessmentBuilderPage() {
               <EyeIcon className="h-4 w-4 mr-2" />
               {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
             </Button>
-            <Button 
-              onClick={handleSaveAssessment} 
-              disabled={!assessment.title || assessment.questions.length === 0}
+            <Button
+              onClick={handleSaveAssessment}
+              disabled={!assessment.title || allQuestions.length === 0}
               className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-none shadow-lg"
             >
               <SaveIcon className="h-4 w-4 mr-2" />
@@ -1547,394 +1577,393 @@ export function AssessmentBuilderPage() {
           </div>
         </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
-        {/* Left Sidebar - Assessment Settings */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <Settings2Icon className="h-5 w-5" />
-                Assessment Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="title" className="text-gray-300">Assessment Title</Label>
-                <Input
-                  id="title"
-                  value={assessment.title}
-                  onChange={(e) => setAssessment({ ...assessment, title: e.target.value })}
-                  placeholder="Enter assessment title"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="description" className="text-gray-300">Description</Label>
-                <Textarea
-                  id="description"
-                  value={assessment.description}
-                  onChange={(e) => setAssessment({ ...assessment, description: e.target.value })}
-                  placeholder="Brief description of the assessment"
-                  rows={3}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="instructions" className="text-gray-300">Instructions</Label>
-                <Textarea
-                  id="instructions"
-                  value={assessment.instructions}
-                  onChange={(e) => setAssessment({ ...assessment, instructions: e.target.value })}
-                  placeholder="Instructions for test takers"
-                  rows={3}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="time_limit" className="text-gray-300">Time Limit (minutes)</Label>
-                <Input
-                  id="time_limit"
-                  type="number"
-                  value={assessment.time_limit || ''}
-                  onChange={(e) => setAssessment({ 
-                    ...assessment, 
-                    time_limit: e.target.value ? parseInt(e.target.value) : null 
-                  })}
-                  placeholder="No limit"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="passing_score" className="text-gray-300">Passing Score (%)</Label>
-                <Input
-                  id="passing_score"
-                  type="number"
-                  value={assessment.passing_score}
-                  onChange={(e) => setAssessment({ 
-                    ...assessment, 
-                    passing_score: parseInt(e.target.value) 
-                  })}
-                  min="0"
-                  max="100"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="randomize"
-                    checked={assessment.randomize_questions}
-                    onCheckedChange={(checked) => setAssessment({ 
-                      ...assessment, 
-                      randomize_questions: checked 
-                    })}
-                  />
-                  <Label htmlFor="randomize" className="text-gray-300">Randomize Questions</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show_results"
-                    checked={assessment.show_results}
-                    onCheckedChange={(checked) => setAssessment({ 
-                      ...assessment, 
-                      show_results: checked 
-                    })}
-                  />
-                  <Label htmlFor="show_results" className="text-gray-300">Show Results</Label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Assessment Stats */}
-          <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
-            <CardHeader>
-              <CardTitle className="text-lg text-white">Assessment Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Questions:</span>
-                  <span className="font-medium text-white">{allQuestions.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Sections:</span>
-                  <span className="font-medium text-white">{assessment.sections.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Total Points:</span>
-                  <span className="font-medium text-white">{totalPoints}</span>
-                </div>
-                {totalTimeLimit > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Est. Time:</span>
-                    <span className="font-medium text-white">{totalTimeLimit}min</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Question Types */}
-          <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
-            <CardHeader>
-              <CardTitle className="text-lg text-white">Available Question Types</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-2">
-                {Object.entries(QUESTION_TYPES).map(([type, config]) => (
-                  <Button
-                    key={type}
-                    variant="outline"
-                    size="sm"
-                    className="justify-start h-auto p-2 bg-white/5 border-white/20 text-white hover:bg-white/10"
-                    onClick={() => {
-                      setEditingQuestion(null)
-                      setIsQuestionDialogOpen(true)
-                    }}
-                  >
-                    <config.icon className="h-4 w-4 mr-2" />
-                    <div className="text-left">
-                      <div className="font-medium text-xs">{config.label}</div>
-                      <div className="text-xs text-gray-400">
-                        {config.description}
-                      </div>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content - Questions with Sections */}
-        <div className="lg:col-span-3">
-          {isPreviewMode ? (
-            <AssessmentPreview assessment={{...assessment, questions: allQuestions}} />
-          ) : (
+        <div className="grid gap-6 lg:grid-cols-4">
+          {/* Left Sidebar - Assessment Settings */}
+          <div className="lg:col-span-1 space-y-4">
             <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl text-white">Assessment Structure</CardTitle>
-                    <CardDescription className="text-gray-300">
-                      Organize questions into sections and configure conditional logic
-                    </CardDescription>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <Settings2Icon className="h-5 w-5" />
+                  Assessment Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="title" className="text-gray-300">Assessment Title</Label>
+                  <Input
+                    id="title"
+                    value={assessment.title || ''}
+                    onChange={(e) => setAssessment(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Enter assessment title"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="description" className="text-gray-300">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={assessment.description || ''}
+                    onChange={(e) => setAssessment(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Brief description of the assessment"
+                    rows={3}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="instructions" className="text-gray-300">Instructions</Label>
+                  <Textarea
+                    id="instructions"
+                    value={assessment.instructions || ''}
+                    onChange={(e) => setAssessment(prev => ({ ...prev, instructions: e.target.value }))}
+                    placeholder="Instructions for test takers"
+                    rows={3}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="time_limit" className="text-gray-300">Time Limit (minutes)</Label>
+                  <Input
+                    id="time_limit"
+                    type="number"
+                    value={assessment.time_limit || ''}
+                    onChange={(e) => setAssessment(prev => ({
+                      ...prev,
+                      time_limit: e.target.value ? parseInt(e.target.value) : null
+                    }))}
+                    placeholder="No limit"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="passing_score" className="text-gray-300">Passing Score (%)</Label>
+                  <Input
+                    id="passing_score"
+                    type="number"
+                    value={assessment.passing_score || 70}
+                    onChange={(e) => setAssessment(prev => ({
+                      ...prev,
+                      passing_score: parseInt(e.target.value)
+                    }))}
+                    min="0"
+                    max="100"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="randomize"
+                      checked={assessment.randomize_questions || false}
+                      onCheckedChange={(checked) => setAssessment(prev => ({
+                        ...prev,
+                        randomize_questions: checked
+                      }))}
+                    />
+                    <Label htmlFor="randomize" className="text-gray-300">Randomize Questions</Label>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsSectionDialogOpen(true)}
-                      className="bg-white/5 border-white/20 text-white hover:bg-white/10 rounded-xl"
-                    >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Section
-                    </Button>
-                    <Button 
-                      onClick={() => setIsQuestionDialogOpen(true)} 
-                      disabled={!activeSectionId}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl disabled:opacity-50"
-                    >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Question
-                    </Button>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="show_results"
+                      checked={assessment.show_results !== false}
+                      onCheckedChange={(checked) => setAssessment(prev => ({
+                        ...prev,
+                        show_results: checked
+                      }))}
+                    />
+                    <Label htmlFor="show_results" className="text-gray-300">Show Results</Label>
                   </div>
                 </div>
-              </CardHeader>
-              
-              <CardContent>
-                {/* Section Tabs */}
-                {assessment.sections.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex flex-wrap gap-2 border-b border-white/20 pb-4">
-                      {assessment.sections.map((section) => (
-                        <Button
-                          key={section.id}
-                          variant={activeSectionId === section.id ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setActiveSectionId(section.id)}
-                          className={`relative rounded-xl ${
-                            activeSectionId === section.id 
-                              ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" 
-                              : "bg-white/5 text-gray-300 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          {section.title}
-                          <Badge variant="secondary" className="ml-2 text-xs bg-white/20 text-white border-0">
-                            {section.questions.length}
-                          </Badge>
-                          {assessment.sections.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="ml-2 h-4 w-4 p-0 hover:bg-red-500/20 hover:text-red-400 text-gray-400"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteSection(section.id)
-                              }}
-                            >
-                              <XCircleIcon className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Active Section Content */}
-                {activeSection ? (
-                  <div className="space-y-4">
-                    {/* Section Header */}
-                    <div className="flex items-center justify-between p-4 bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-white">{activeSection.title}</h3>
-                        {activeSection.description && (
-                          <p className="text-sm text-gray-300 mt-1">
-                            {activeSection.description}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingSection(activeSection)
-                          setIsSectionDialogOpen(true)
-                        }}
-                        className="bg-white/5 hover:bg-white/10 text-white rounded-xl"
-                      >
-                        <EditIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Questions in Section */}
-                    {activeSection.questions.length === 0 ? (
-                      <div className="text-center py-12">
-                        <BookOpenIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium mb-2 text-white">No questions in this section</h3>
-                        <p className="text-gray-300 mb-4">
-                          Add questions to start building this section
-                        </p>
-                        <Button 
-                          onClick={() => setIsQuestionDialogOpen(true)}
-                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl"
-                        >
-                          <PlusIcon className="h-4 w-4 mr-2" />
-                          Add First Question
-                        </Button>
-                      </div>
-                    ) : (
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                      >
-                        <SortableContext
-                          items={activeSection.questions.map(q => q.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          <div className="space-y-4">
-                            {activeSection.questions.map((question, index) => (
-                              <DraggableQuestion
-                                key={question.id}
-                                question={question}
-                                index={index}
-                                onEdit={setEditingQuestion}
-                                onDelete={handleDeleteQuestion}
-                                onDuplicate={handleDuplicateQuestion}
-                              />
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <BookOpenIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium mb-2 text-white">No sections created</h3>
-                    <p className="text-gray-300 mb-4">
-                      Create your first section to organize questions
-                    </p>
-                    <Button 
-                      onClick={() => setIsSectionDialogOpen(true)}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl"
-                    >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Create First Section
-                    </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
 
-      {/* Add/Edit Question Dialog */}
-      <Dialog 
-        open={isQuestionDialogOpen || !!editingQuestion} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsQuestionDialogOpen(false)
-            setEditingQuestion(null)
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border border-white/20 backdrop-blur-lg">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-white">
-              {editingQuestion ? 'Edit Question' : 'Add New Question'}
-            </DialogTitle>
-            <DialogDescription className="text-gray-300">
-              Configure your question with the available options and settings
-            </DialogDescription>
-          </DialogHeader>
-          
-          <QuestionForm
-            question={editingQuestion}
-            availableQuestions={allQuestions}
-            onSave={editingQuestion ? handleEditQuestion : handleAddQuestion}
-            onCancel={() => {
+            {/* Assessment Stats */}
+            <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
+              <CardHeader>
+                <CardTitle className="text-lg text-white">Assessment Stats</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Questions:</span>
+                    <span className="font-medium text-white">{allQuestions.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Sections:</span>
+                    <span className="font-medium text-white">{assessment.sections.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Total Points:</span>
+                    <span className="font-medium text-white">{totalPoints}</span>
+                  </div>
+                  {totalTimeLimit > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Est. Time:</span>
+                      <span className="font-medium text-white">{totalTimeLimit}min</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Question Types */}
+            <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
+              <CardHeader>
+                <CardTitle className="text-lg text-white">Available Question Types</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.entries(QUESTION_TYPES).map(([type, config]) => (
+                    <Button
+                      key={type}
+                      variant="outline"
+                      size="sm"
+                      className="justify-start h-auto p-2 bg-white/5 border-white/20 text-white hover:bg-white/10 whitespace-normal text-left break-words"
+                      onClick={() => {
+                        setEditingQuestion(null)
+                        setIsQuestionDialogOpen(true)
+                      }}
+                    >
+                      <config.icon className="h-4 w-4 mr-2" />
+                      <div className="text-left whitespace-normal break-words">
+                        <div className="font-medium text-xs">{config.label}</div>
+                        <div className="text-xs text-gray-400">
+                          {config.description}
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content - Questions with Sections */}
+          <div className="lg:col-span-3">
+            {isPreviewMode ? (
+              <AssessmentPreview assessment={{ ...assessment, questions: allQuestions }} />
+            ) : (
+              <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 shadow-2xl rounded-3xl">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl text-white">Assessment Structure</CardTitle>
+                      <CardDescription className="text-gray-300">
+                        Organize questions into sections and configure conditional logic
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsSectionDialogOpen(true)}
+                        className="bg-white/5 border-white/20 text-white hover:bg-white/10 rounded-xl"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Add Section
+                      </Button>
+                      <Button
+                        onClick={() => setIsQuestionDialogOpen(true)}
+                        disabled={!activeSectionId}
+                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl disabled:opacity-50"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Add Question
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  {/* Section Tabs */}
+                  {assessment.sections.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex flex-wrap gap-2 border-b border-white/20 pb-4">
+                        {assessment.sections.map((section) => (
+                          <Button
+                            key={section.id}
+                            variant={activeSectionId === section.id ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setActiveSectionId(section.id)}
+                            className={`relative rounded-xl ${activeSectionId === section.id
+                              ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                              : "bg-white/5 text-gray-300 hover:text-white hover:bg-white/10"
+                              }`}
+                          >
+                            {section.title}
+                            <Badge variant="secondary" className="ml-2 text-xs bg-white/20 text-white border-0">
+                              {section.questions.length}
+                            </Badge>
+                            {assessment.sections.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="ml-2 h-4 w-4 p-0 hover:bg-red-500/20 hover:text-red-400 text-gray-400"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteSection(section.id)
+                                }}
+                              >
+                                <XCircleIcon className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Section Content */}
+                  {activeSection ? (
+                    <div className="space-y-4">
+                      {/* Section Header */}
+                      <div className="flex items-center justify-between p-4 bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-white">{activeSection.title}</h3>
+                          {activeSection.description && (
+                            <p className="text-sm text-gray-300 mt-1">
+                              {activeSection.description}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingSection(activeSection)
+                            setIsSectionDialogOpen(true)
+                          }}
+                          className="bg-white/5 hover:bg-white/10 text-white rounded-xl"
+                        >
+                          <EditIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Questions in Section */}
+                      {activeSection.questions.length === 0 ? (
+                        <div className="text-center py-12">
+                          <BookOpenIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                          <h3 className="text-lg font-medium mb-2 text-white">No questions in this section</h3>
+                          <p className="text-gray-300 mb-4">
+                            Add questions to start building this section
+                          </p>
+                          <Button
+                            onClick={() => setIsQuestionDialogOpen(true)}
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl"
+                          >
+                            <PlusIcon className="h-4 w-4 mr-2" />
+                            Add First Question
+                          </Button>
+                        </div>
+                      ) : (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={activeSection.questions.map(q => q.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="space-y-4">
+                              {activeSection.questions.map((question, index) => (
+                                <DraggableQuestion
+                                  key={question.id}
+                                  question={question}
+                                  index={index}
+                                  onEdit={setEditingQuestion}
+                                  onDelete={handleDeleteQuestion}
+                                  onDuplicate={handleDuplicateQuestion}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <BookOpenIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-2 text-white">No sections created</h3>
+                      <p className="text-gray-300 mb-4">
+                        Create your first section to organize questions
+                      </p>
+                      <Button
+                        onClick={() => setIsSectionDialogOpen(true)}
+                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Create First Section
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* Add/Edit Question Dialog */}
+        <Dialog
+          open={isQuestionDialogOpen || !!editingQuestion}
+          onOpenChange={(open) => {
+            if (!open) {
               setIsQuestionDialogOpen(false)
               setEditingQuestion(null)
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+            }
+          }}
+        >
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border border-white/20 backdrop-blur-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl text-white">
+                {editingQuestion ? 'Edit Question' : 'Add New Question'}
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Configure your question with the available options and settings
+              </DialogDescription>
+            </DialogHeader>
 
-      {/* Add/Edit Section Dialog */}
-      <Dialog 
-        open={isSectionDialogOpen} 
-        onOpenChange={setIsSectionDialogOpen}
-      >
-        <DialogContent className="max-w-md bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border border-white/20 backdrop-blur-lg">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-white">
-              {editingSection ? 'Edit Section' : 'Add New Section'}
-            </DialogTitle>
-            <DialogDescription className="text-gray-300">
-              Create logical groups to organize your questions
-            </DialogDescription>
-          </DialogHeader>
-          
-          <SectionForm
-            section={editingSection}
-            onSave={editingSection ? handleEditSection : handleAddSection}
-            onCancel={() => {
-              setIsSectionDialogOpen(false)
-              setEditingSection(null)
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+            <QuestionForm
+              question={editingQuestion}
+              availableQuestions={allQuestions}
+              onSave={editingQuestion ? handleEditQuestion : handleAddQuestion}
+              onCancel={() => {
+                setIsQuestionDialogOpen(false)
+                setEditingQuestion(null)
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Add/Edit Section Dialog */}
+        <Dialog
+          open={isSectionDialogOpen}
+          onOpenChange={setIsSectionDialogOpen}
+        >
+          <DialogContent className="max-w-md bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border border-white/20 backdrop-blur-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl text-white">
+                {editingSection ? 'Edit Section' : 'Add New Section'}
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Create logical groups to organize your questions
+              </DialogDescription>
+            </DialogHeader>
+
+            <SectionForm
+              section={editingSection}
+              onSave={editingSection ? handleEditSection : handleAddSection}
+              onCancel={() => {
+                setIsSectionDialogOpen(false)
+                setEditingSection(null)
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
@@ -1980,15 +2009,15 @@ function SectionForm({ section, onSave, onCancel }) {
       </div>
 
       <DialogFooter>
-        <Button 
-          type="button" 
-          variant="outline" 
+        <Button
+          type="button"
+          variant="outline"
           onClick={onCancel}
           className="bg-white/5 border-white/20 text-white hover:bg-white/10 rounded-xl"
         >
           Cancel
         </Button>
-        <Button 
+        <Button
           type="submit"
           className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 rounded-xl"
         >
@@ -2008,17 +2037,17 @@ function FileUploadField({ answer, onAnswerChange, allowedTypes, maxSize }) {
 
   const validateFile = (file) => {
     const fileExtension = file.name.split('.').pop().toLowerCase()
-    
+
     if (!allowedTypes.includes(fileExtension)) {
       setError(`File type .${fileExtension} is not allowed. Allowed types: ${allowedTypes.join(', ')}`)
       return false
     }
-    
+
     if (file.size > maxSize * 1024 * 1024) {
       setError(`File size exceeds ${maxSize}MB limit`)
       return false
     }
-    
+
     setError('')
     return true
   }
@@ -2062,7 +2091,7 @@ function FileUploadField({ answer, onAnswerChange, allowedTypes, maxSize }) {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelect(e.dataTransfer.files)
     }
@@ -2133,8 +2162,8 @@ function FileUploadField({ answer, onAnswerChange, allowedTypes, maxSize }) {
             <span>{uploadProgress}%</span>
           </div>
           <div className="w-full bg-secondary rounded-full h-2">
-            <div 
-              className="bg-primary h-2 rounded-full transition-all duration-300" 
+            <div
+              className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>

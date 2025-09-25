@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { SettingsMenu } from '@/components/settings-menu'
+import { DemoDialog } from '@/components/demo-dialog'
 import { Card } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
@@ -51,6 +53,7 @@ export function LandingPage() {
           </a>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
+            <SettingsMenu />
             <Button asChild className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-none shadow-lg">
               <Link to="/app">Get Started</Link>
             </Button>
@@ -59,6 +62,7 @@ export function LandingPage() {
 
         <div className="md:hidden flex items-center space-x-2">
           <ThemeToggle />
+          <SettingsMenu />
           <Button size="sm" asChild className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
             <Link to="/app">Get started</Link>
           </Button>
@@ -78,7 +82,7 @@ export function LandingPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-sm font-medium mb-6"
               >
                 <Sparkles className="h-4 w-4" />
-                AI-Powered Hiring Platform
+                Smart Hiring Platform
               </motion.div>
 
               <motion.h1
@@ -108,7 +112,7 @@ export function LandingPage() {
               >
                 Transform your hiring process with our cutting-edge platform.
                 <span className="text-purple-300 font-semibold"> Smart assessments</span>,
-                <span className="text-pink-300 font-semibold"> AI-driven insights</span>, and
+                <span className="text-pink-300 font-semibold"> Smart insights</span>, and
                 <span className="text-blue-300 font-semibold"> seamless collaboration</span>.
               </motion.p>
 
@@ -124,9 +128,7 @@ export function LandingPage() {
                     <ArrowRight className="h-5 w-5" />
                   </Link>
                 </Button>
-                <Button variant="outline" size="lg" className="border-gray-600 text-gray-300 hover:bg-white/10 hover:text-white text-lg px-8 py-4 rounded-xl">
-                  Watch Demo
-                </Button>
+                <DemoDialog triggerLabel="Watch Demo" />
               </motion.div>
 
               <motion.div
@@ -241,12 +243,12 @@ export function LandingPage() {
               {
                 icon: Briefcase,
                 title: "Smart Job Management",
-                description: "Create, edit, and manage job postings with AI-powered suggestions. Track applications and optimize your workflow with intelligent insights.",
+                description: "Create, edit, and manage job postings with Smart suggestions. Track applications and optimize your workflow with intelligent insights.",
                 delay: 0.1,
                 gradient: "from-purple-500 to-pink-500",
                 bgGradient: "from-purple-500/20 to-pink-500/20",
                 borderGradient: "from-purple-500/50 to-pink-500/50",
-                features: ["AI-powered job descriptions", "Automated posting to multiple boards", "Real-time analytics"],
+                features: ["Smart job descriptions", "Automated posting to multiple boards", "Real-time analytics"],
                 mockup: (
                   <div className="bg-gray-900/50 rounded-lg p-4 border border-purple-500/30">
                     <div className="flex items-center gap-2 mb-3">
@@ -572,9 +574,7 @@ export function LandingPage() {
                       <ChevronRight className="h-5 w-5" />
                     </Link>
                   </Button>
-                  <Button variant="outline" size="lg" className="border-gray-400 text-gray-300 hover:bg-white/10 hover:text-white text-lg px-10 py-4 rounded-xl backdrop-blur-sm">
-                    Schedule Demo
-                  </Button>
+                  <DemoDialog triggerLabel="Schedule Demo" />
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400">
@@ -614,7 +614,7 @@ export function LandingPage() {
                 <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">TALENT FLOW</span>
               </div>
               <p className="text-gray-400 text-sm max-w-xs">
-                The future of hiring is here. Transform your recruitment process with AI-powered insights and seamless collaboration.
+                The future of hiring is here. Transform your recruitment process with Smart insights and seamless collaboration.
               </p>
             </div>
 

@@ -179,7 +179,14 @@ export const handlers = [
     const filtered = filterAndSearch(jobs, { search, department, status, sort_by, sort_order })
     const result = paginate(filtered, page, limit)
 
-    return HttpResponse.json(result)
+    // Attach applications_count to each job in the current page
+    const applications = await db.applications.toArray()
+    const dataWithCounts = result.data.map(job => ({
+      ...job,
+      applications_count: applications.filter(a => a.job_id === job.id).length
+    }))
+
+    return HttpResponse.json({ ...result, data: dataWithCounts })
   }),
 
   http.get('/api/jobs/stats', async () => {
@@ -230,7 +237,11 @@ export const handlers = [
       return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    return HttpResponse.json(job)
+    // Attach applications_count for this job
+    const applications = await db.applications.toArray()
+    const applications_count = applications.filter(a => a.job_id === job.id).length
+
+    return HttpResponse.json({ ...job, applications_count })
   }),
 
   http.get('/api/jobs/slug/:slug', async ({ params }) => {
@@ -466,15 +477,25 @@ export const handlers = [
     if (networkError) return networkError
 
     const candidates = await db.candidates.toArray()
+    const applied = candidates.filter(c => c.stage === 'applied').length
+    const screening = candidates.filter(c => c.stage === 'screen').length
+    const test = candidates.filter(c => c.stage === 'test').length
+    const offer = candidates.filter(c => c.stage === 'offer').length
+    const hired = candidates.filter(c => c.stage === 'hired').length
+    const rejected = candidates.filter(c => c.stage === 'rejected').length
+
     const stats = {
       total: candidates.length,
-      applied: candidates.filter(c => c.stage === 'applied').length,
-      review: candidates.filter(c => c.stage === 'review').length,
-      interview: candidates.filter(c => c.stage === 'interview').length,
-      assessment: candidates.filter(c => c.stage === 'assessment').length,
-      offer: candidates.filter(c => c.stage === 'offer').length,
-      hired: candidates.filter(c => c.stage === 'hired').length,
-      rejected: candidates.filter(c => c.stage === 'rejected').length
+      applied,
+      screening,              // UI expects this key
+      test,                   // Unified stage replacing interview/assessment in UI
+      offer,
+      hired,
+      rejected,
+      // Back-compat with any callers using older/alternate keys
+      review: screening,
+      interview: test,
+      assessment: test
     }
 
     return HttpResponse.json(stats)
@@ -952,9 +973,35 @@ export const handlers = [
     const sort_by = url.searchParams.get('sort_by') || 'applied_at'
     const sort_order = url.searchParams.get('sort_order') || 'desc'
 
-    const applications = await db.applications.toArray()
-    const filtered = filterAndSearch(applications, { job_id, candidate_id, status, sort_by, sort_order })
-    const result = paginate(filtered, page, limit)
+    let applications = await db.applications.toArray()
+
+    // Explicit filtering for applications endpoint
+    if (job_id) {
+      const jobIdNum = parseInt(job_id)
+      applications = applications.filter(a => a.job_id === jobIdNum)
+    }
+    if (candidate_id) {
+      const candIdNum = parseInt(candidate_id)
+      applications = applications.filter(a => a.candidate_id === candIdNum)
+    }
+    if (status) {
+      // Map status filter to our stored field `stage`
+      applications = applications.filter(a => (a.stage || a.status) === status)
+    }
+
+    // Sorting
+    const sortKey = sort_by
+    const order = sort_order === 'asc' ? 1 : -1
+    applications.sort((a, b) => {
+      const va = a[sortKey]
+      const vb = b[sortKey]
+      if (va == null && vb == null) return 0
+      if (va == null) return 1
+      if (vb == null) return -1
+      return (va > vb ? 1 : va < vb ? -1 : 0) * order
+    })
+
+    const result = paginate(applications, page, limit)
 
     return HttpResponse.json(result)
   }),
@@ -964,15 +1011,25 @@ export const handlers = [
     if (networkError) return networkError
 
     const applications = await db.applications.toArray()
+    const applied = applications.filter(a => a.stage === 'applied').length
+    const screening = applications.filter(a => a.stage === 'screen').length
+    const test = applications.filter(a => a.stage === 'test').length
+    const offer = applications.filter(a => a.stage === 'offer').length
+    const hired = applications.filter(a => a.stage === 'hired').length
+    const rejected = applications.filter(a => a.stage === 'rejected').length
+
     const stats = {
       total: applications.length,
-      applied: applications.filter(a => a.status === 'applied').length,
-      review: applications.filter(a => a.status === 'review').length,
-      interview: applications.filter(a => a.status === 'interview').length,
-      assessment: applications.filter(a => a.status === 'assessment').length,
-      offer: applications.filter(a => a.status === 'offer').length,
-      hired: applications.filter(a => a.status === 'hired').length,
-      rejected: applications.filter(a => a.status === 'rejected').length
+      applied,
+      screening,
+      test,
+      offer,
+      hired,
+      rejected,
+      // Back-compat keys for any other UI that might read them
+      review: screening,
+      interview: test,
+      assessment: test
     }
 
     return HttpResponse.json(stats)
@@ -1090,6 +1147,147 @@ export const handlers = [
     return HttpResponse.json(stats)
   }),
 
+  // Dedicated endpoint to fetch assessment strictly by ID (avoids conflicts with job routes)
+  http.get('/api/assessments/id/:id', async ({ params }) => {
+    const networkError = await handleNetworkSimulation()
+    if (networkError) return networkError
+
+    const id = parseInt(params.id)
+    const assessment = await db.assessments.get(id)
+    if (!assessment) {
+      return HttpResponse.json({ error: 'Assessment not found' }, { status: 404 })
+    }
+    return HttpResponse.json(assessment)
+  }),
+
+  // Job-specific assessment endpoints (placed BEFORE generic :id handlers to avoid conflicts)
+  http.get('/api/assessments/:jobId', async ({ params }) => {
+    const networkError = await handleNetworkSimulation()
+    if (networkError) return networkError
+
+    const jobParam = params.jobId
+    let jobId = parseInt(jobParam)
+
+    // Support slug-based job identifier
+    if (Number.isNaN(jobId)) {
+      const job = await db.jobs.where('slug').equals(jobParam).first()
+      if (!job) {
+        return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      jobId = job.id
+    }
+
+    // Return a single assessment for this job (the app expects an object)
+    const assessment = await db.assessments.where('job_id').equals(jobId).first()
+    if (!assessment) {
+      return HttpResponse.json(null)
+    }
+    return HttpResponse.json(assessment)
+  }),
+
+  http.put('/api/assessments/:jobId', async ({ params, request }) => {
+    const networkError = await handleNetworkSimulation()
+    if (networkError) return networkError
+
+    const jobParam = params.jobId
+    let jobId = parseInt(jobParam)
+
+    if (Number.isNaN(jobId)) {
+      const job = await db.jobs.where('slug').equals(jobParam).first()
+      if (!job) {
+        return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      jobId = job.id
+    }
+
+    const assessmentData = await request.json()
+
+    // Upsert assessment for this job
+    let assessment = await db.assessments.where('job_id').equals(jobId).first()
+
+    if (assessment) {
+      await db.assessments.update(assessment.id, {
+        ...assessmentData,
+        job_id: jobId,
+        updated_at: new Date()
+      })
+      assessment = await db.assessments.get(assessment.id)
+    } else {
+      const newAssessment = {
+        id: Date.now(),
+        job_id: jobId,
+        ...assessmentData,
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+      await db.assessments.add(newAssessment)
+      assessment = newAssessment
+    }
+
+    return HttpResponse.json(assessment)
+  }),
+
+  // Create a new assessment for a job (does not overwrite existing)
+  http.post('/api/jobs/:jobId/assessments', async ({ params, request }) => {
+    const networkError = await handleNetworkSimulation()
+    if (networkError) return networkError
+
+    const jobParam = params.jobId
+    let jobId = parseInt(jobParam)
+    if (Number.isNaN(jobId)) {
+      const job = await db.jobs.where('slug').equals(jobParam).first()
+      if (!job) {
+        return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      jobId = job.id
+    }
+
+    const assessmentData = await request.json()
+    const newAssessment = {
+      id: Date.now(),
+      job_id: jobId,
+      ...assessmentData,
+      created_at: new Date(),
+      updated_at: new Date()
+    }
+    await db.assessments.add(newAssessment)
+    return HttpResponse.json(newAssessment, { status: 201 })
+  }),
+
+  http.post('/api/assessments/:jobId/submit', async ({ params, request }) => {
+    const networkError = await handleNetworkSimulation()
+    if (networkError) return networkError
+
+    const jobParam = params.jobId
+    let jobId = parseInt(jobParam)
+
+    if (Number.isNaN(jobId)) {
+      const job = await db.jobs.where('slug').equals(jobParam).first()
+      if (!job) {
+        return HttpResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      jobId = job.id
+    }
+
+    const responseData = await request.json()
+
+    const response = {
+      id: Date.now(),
+      job_id: jobId,
+      assessment_id: responseData.assessment_id,
+      candidate_id: responseData.candidate_id,
+      responses: responseData.responses,
+      score: responseData.score || null,
+      submitted_at: new Date(),
+      status: 'submitted'
+    }
+
+    await db.assessment_responses.add(response)
+
+    return HttpResponse.json(response, { status: 201 })
+  }),
+
+  // Generic assessment-by-id handlers
   http.get('/api/assessments/:id', async ({ params }) => {
     const networkError = await handleNetworkSimulation()
     if (networkError) return networkError
@@ -1166,76 +1364,7 @@ export const handlers = [
     return HttpResponse.json({ success: true })
   }),
 
-  // Job-specific assessment endpoints
-  http.get('/api/assessments/:jobId', async ({ params }) => {
-    const networkError = await handleNetworkSimulation()
-    if (networkError) return networkError
-
-    const jobId = parseInt(params.jobId)
-
-    // Find assessments for this specific job
-    const assessments = await db.assessments.where('job_id').equals(jobId).toArray()
-
-    return HttpResponse.json(assessments)
-  }),
-
-  http.put('/api/assessments/:jobId', async ({ params, request }) => {
-    const networkError = await handleNetworkSimulation()
-    if (networkError) return networkError
-
-    const jobId = parseInt(params.jobId)
-    const assessmentData = await request.json()
-
-    // Find existing assessment for this job or create new one
-    let assessment = await db.assessments.where('job_id').equals(jobId).first()
-
-    if (assessment) {
-      // Update existing assessment
-      await db.assessments.update(assessment.id, {
-        ...assessmentData,
-        updated_at: new Date()
-      })
-      assessment = await db.assessments.get(assessment.id)
-    } else {
-      // Create new assessment for this job
-      const newAssessment = {
-        id: Date.now(),
-        job_id: jobId,
-        ...assessmentData,
-        created_at: new Date(),
-        updated_at: new Date()
-      }
-      await db.assessments.add(newAssessment)
-      assessment = newAssessment
-    }
-
-    return HttpResponse.json(assessment)
-  }),
-
-  http.post('/api/assessments/:jobId/submit', async ({ params, request }) => {
-    const networkError = await handleNetworkSimulation()
-    if (networkError) return networkError
-
-    const jobId = parseInt(params.jobId)
-    const responseData = await request.json()
-
-    // Create assessment response and store locally
-    const response = {
-      id: Date.now(),
-      job_id: jobId,
-      assessment_id: responseData.assessment_id,
-      candidate_id: responseData.candidate_id,
-      responses: responseData.responses,
-      score: responseData.score || null,
-      submitted_at: new Date(),
-      status: 'submitted'
-    }
-
-    // Store in IndexedDB for local persistence
-    await db.assessment_responses.add(response)
-
-    return HttpResponse.json(response, { status: 201 })
-  }),
+  // End job-specific endpoints
 
   // Assessment responses endpoints
   http.get('/api/assessment-responses', async ({ request }) => {
@@ -1246,10 +1375,11 @@ export const handlers = [
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 20
     const assessment_id = url.searchParams.get('assessment_id')
+    const job_id = url.searchParams.get('job_id')
     const candidate_id = url.searchParams.get('candidate_id')
 
     const responses = await db.assessment_responses.toArray()
-    const filtered = filterAndSearch(responses, { assessment_id, candidate_id })
+    const filtered = filterAndSearch(responses, { assessment_id, candidate_id, job_id })
     const result = paginate(filtered, page, limit)
 
     return HttpResponse.json(result)

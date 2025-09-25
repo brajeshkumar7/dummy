@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tansta
 const applicationsApi = {
   getAll: async (params = {}) => {
     const url = new URL('/api/applications', window.location.origin)
-    
+
     // Add query parameters
     if (params.page) url.searchParams.set('page', params.page)
     if (params.limit) url.searchParams.set('limit', params.limit)
@@ -13,18 +13,18 @@ const applicationsApi = {
     if (params.status) url.searchParams.set('status', params.status)
     if (params.sort_by) url.searchParams.set('sort_by', params.sort_by)
     if (params.sort_order) url.searchParams.set('sort_order', params.sort_order)
-    
+
     const response = await fetch(url)
     if (!response.ok) throw new Error('Failed to fetch applications')
     return response.json()
   },
-  
+
   getById: async (id) => {
     const response = await fetch(`/api/applications/${id}`)
     if (!response.ok) throw new Error('Failed to fetch application')
     return response.json()
   },
-  
+
   create: async (applicationData) => {
     const response = await fetch('/api/applications', {
       method: 'POST',
@@ -34,7 +34,7 @@ const applicationsApi = {
     if (!response.ok) throw new Error('Failed to create application')
     return response.json()
   },
-  
+
   update: async ({ id, ...applicationData }) => {
     const response = await fetch(`/api/applications/${id}`, {
       method: 'PUT',
@@ -44,13 +44,13 @@ const applicationsApi = {
     if (!response.ok) throw new Error('Failed to update application')
     return response.json()
   },
-  
+
   delete: async (id) => {
     const response = await fetch(`/api/applications/${id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error('Failed to delete application')
     return response.json()
   },
-  
+
   updateStage: async ({ id, status, notes }) => {
     const response = await fetch(`/api/applications/${id}/status`, {
       method: 'PUT',
@@ -66,22 +66,22 @@ const applicationsApi = {
 const assessmentsApi = {
   getAll: async (params = {}) => {
     const url = new URL('/api/assessments', window.location.origin)
-    
+
     if (params.job_id) url.searchParams.set('job_id', params.job_id)
     if (params.page) url.searchParams.set('page', params.page)
     if (params.limit) url.searchParams.set('limit', params.limit)
-    
+
     const response = await fetch(url)
     if (!response.ok) throw new Error('Failed to fetch assessments')
     return response.json()
   },
-  
+
   getById: async (id) => {
-    const response = await fetch(`/api/assessments/${id}`)
+    const response = await fetch(`/api/assessments/id/${id}`)
     if (!response.ok) throw new Error('Failed to fetch assessment')
     return response.json()
   },
-  
+
   create: async (assessmentData) => {
     const response = await fetch('/api/assessments', {
       method: 'POST',
@@ -91,7 +91,7 @@ const assessmentsApi = {
     if (!response.ok) throw new Error('Failed to create assessment')
     return response.json()
   },
-  
+
   update: async ({ id, ...assessmentData }) => {
     const response = await fetch(`/api/assessments/${id}`, {
       method: 'PUT',
@@ -101,18 +101,51 @@ const assessmentsApi = {
     if (!response.ok) throw new Error('Failed to update assessment')
     return response.json()
   },
-  
+
   delete: async (id) => {
     const response = await fetch(`/api/assessments/${id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error('Failed to delete assessment')
     return response.json()
   },
-  
+
   duplicate: async (id) => {
     const response = await fetch(`/api/assessments/${id}/duplicate`, {
       method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to duplicate assessment')
+    return response.json()
+  },
+  // Job-scoped endpoints
+  getForJob: async (jobId) => {
+    const response = await fetch(`/api/assessments/${jobId}`)
+    if (!response.ok) throw new Error('Failed to fetch job assessment')
+    return response.json()
+  },
+  createForJob: async ({ jobId, assessment }) => {
+    const response = await fetch(`/api/jobs/${jobId}/assessments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assessment)
+    })
+    if (!response.ok) throw new Error('Failed to create job assessment')
+    return response.json()
+  },
+  upsertForJob: async ({ jobId, assessment }) => {
+    const response = await fetch(`/api/assessments/${jobId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assessment)
+    })
+    if (!response.ok) throw new Error('Failed to save job assessment')
+    return response.json()
+  },
+  submitForJob: async ({ jobId, submission }) => {
+    const response = await fetch(`/api/assessments/${jobId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submission)
+    })
+    if (!response.ok) throw new Error('Failed to submit assessment')
     return response.json()
   }
 }
@@ -121,23 +154,23 @@ const assessmentsApi = {
 const assessmentResponsesApi = {
   getAll: async (params = {}) => {
     const url = new URL('/api/assessment-responses', window.location.origin)
-    
+
     if (params.assessment_id) url.searchParams.set('assessment_id', params.assessment_id)
     if (params.candidate_id) url.searchParams.set('candidate_id', params.candidate_id)
     if (params.page) url.searchParams.set('page', params.page)
     if (params.limit) url.searchParams.set('limit', params.limit)
-    
+
     const response = await fetch(url)
     if (!response.ok) throw new Error('Failed to fetch assessment responses')
     return response.json()
   },
-  
+
   getById: async (id) => {
     const response = await fetch(`/api/assessment-responses/${id}`)
     if (!response.ok) throw new Error('Failed to fetch assessment response')
     return response.json()
   },
-  
+
   create: async (responseData) => {
     const response = await fetch('/api/assessment-responses', {
       method: 'POST',
@@ -147,7 +180,7 @@ const assessmentResponsesApi = {
     if (!response.ok) throw new Error('Failed to create assessment response')
     return response.json()
   },
-  
+
   update: async ({ id, ...responseData }) => {
     const response = await fetch(`/api/assessment-responses/${id}`, {
       method: 'PUT',
@@ -180,7 +213,7 @@ export function useApplication(id) {
 
 export function useCreateApplication() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: applicationsApi.create,
     onSuccess: (newApplication) => {
@@ -192,7 +225,7 @@ export function useCreateApplication() {
 
 export function useUpdateApplication() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: applicationsApi.update,
     onSuccess: (updatedApplication) => {
@@ -204,7 +237,7 @@ export function useUpdateApplication() {
 
 export function useDeleteApplication() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: applicationsApi.delete,
     onSuccess: (_, deletedId) => {
@@ -216,7 +249,7 @@ export function useDeleteApplication() {
 
 export function useUpdateApplicationStage() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: applicationsApi.updateStage,
     onSuccess: (updatedApplication) => {
@@ -248,7 +281,7 @@ export function useAssessment(id) {
 
 export function useCreateAssessment() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: assessmentsApi.create,
     onSuccess: (newAssessment) => {
@@ -260,7 +293,7 @@ export function useCreateAssessment() {
 
 export function useUpdateAssessment() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: assessmentsApi.update,
     onSuccess: (updatedAssessment) => {
@@ -272,7 +305,7 @@ export function useUpdateAssessment() {
 
 export function useDeleteAssessment() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: assessmentsApi.delete,
     onSuccess: (_, deletedId) => {
@@ -284,12 +317,56 @@ export function useDeleteAssessment() {
 
 export function useDuplicateAssessment() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: assessmentsApi.duplicate,
     onSuccess: (duplicatedAssessment) => {
       queryClient.invalidateQueries({ queryKey: ['assessments'] })
       queryClient.setQueryData(['assessments', duplicatedAssessment.id], duplicatedAssessment)
+    }
+  })
+}
+
+// Job-scoped assessment hooks
+export function useJobAssessment(jobId) {
+  return useQuery({
+    queryKey: ['job-assessment', jobId],
+    queryFn: () => assessmentsApi.getForJob(jobId),
+    enabled: !!jobId,
+    staleTime: 10 * 60 * 1000
+  })
+}
+
+export function useUpsertJobAssessment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: assessmentsApi.upsertForJob,
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: ['job-assessment', saved.job_id], exact: false })
+      queryClient.invalidateQueries({ queryKey: ['assessments'], exact: false })
+      queryClient.invalidateQueries({ queryKey: ['assessment-responses'], exact: false })
+    }
+  })
+}
+
+export function useCreateJobAssessment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: assessmentsApi.createForJob,
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: ['job-assessment', saved.job_id], exact: false })
+      queryClient.invalidateQueries({ queryKey: ['assessments'], exact: false })
+      queryClient.invalidateQueries({ queryKey: ['assessment-responses'], exact: false })
+    }
+  })
+}
+
+export function useSubmitJobAssessment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: assessmentsApi.submitForJob,
+    onSuccess: (resp) => {
+      queryClient.invalidateQueries({ queryKey: ['assessment-responses'] })
     }
   })
 }
@@ -315,7 +392,7 @@ export function useAssessmentResponse(id) {
 
 export function useCreateAssessmentResponse() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: assessmentResponsesApi.create,
     onSuccess: (newResponse) => {
@@ -327,7 +404,7 @@ export function useCreateAssessmentResponse() {
 
 export function useUpdateAssessmentResponse() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: assessmentResponsesApi.update,
     onSuccess: (updatedResponse) => {

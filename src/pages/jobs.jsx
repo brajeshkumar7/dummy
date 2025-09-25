@@ -268,6 +268,11 @@ export default function JobsPage() {
   const dragModeJobs = isDragMode ? allJobs : jobs
   const pagination = jobsResponse?.pagination
 
+  // Totals across ALL jobs (not limited by current page)
+  const totalActiveJobs = Array.isArray(allJobs) ? allJobs.filter(j => j.status === 'active').length : 0
+  const totalDraftJobs = Array.isArray(allJobs) ? allJobs.filter(j => j.status === 'draft').length : 0
+  const totalApplicationsAllJobs = Array.isArray(allJobs) ? allJobs.reduce((sum, j) => sum + (j.applications_count || 0), 0) : 0
+
   // Status badge variants
   const getStatusVariant = (status) => {
     const variants = {
@@ -730,15 +735,15 @@ export default function JobsPage() {
               <div className="flex items-center gap-6 pt-2">
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>{jobs.filter(job => job.status === 'active').length} Active</span>
+                  <span>{totalActiveJobs} Active</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                   <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <span>{jobs.filter(job => job.status === 'draft').length} Draft</span>
+                  <span>{totalDraftJobs} Draft</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>{jobs.reduce((sum, job) => sum + (job.applications_count || 0), 0)} Applications</span>
+                  <span>{totalApplicationsAllJobs} Applications</span>
                 </div>
               </div>
             </div>
@@ -793,7 +798,7 @@ export default function JobsPage() {
             </CardHeader>
             <CardContent className="relative">
               <div className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-1">
-                {jobs.filter(job => job.status === 'active').length}
+                {totalActiveJobs}
               </div>
               <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
                 Currently recruiting
@@ -812,7 +817,7 @@ export default function JobsPage() {
             </CardHeader>
             <CardContent className="relative">
               <div className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-1">
-                {jobs.filter(job => job.status === 'draft').length}
+                {totalDraftJobs}
               </div>
               <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
                 Awaiting publication
@@ -831,7 +836,7 @@ export default function JobsPage() {
             </CardHeader>
             <CardContent className="relative">
               <div className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-1">
-                {jobs.reduce((sum, job) => sum + (job.applications_count || 0), 0)}
+                {totalApplicationsAllJobs}
               </div>
               <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
                 Total submissions

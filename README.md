@@ -12,6 +12,14 @@
 
 TALENT FLOW is a comprehensive, modern hiring platform built with React 18 and enterprise-grade features. It provides end-to-end recruitment management with advanced search capabilities, real-time analytics, and seamless candidate tracking.
 
+## ✅ Deliverables
+
+- Deployed App Link: <YOUR_DEPLOY_URL>
+- GitHub Repository Link: <YOUR_GITHUB_REPO_URL>
+- README: This document includes setup, architecture, issues, and technical decisions
+
+> Replace the placeholders above with your actual links before submission.
+
 ## ✨ Key Features
 
 ### 🎯 **Core Functionality**
@@ -132,7 +140,7 @@ TALENT FLOW is a comprehensive, modern hiring platform built with React 18 and e
 - **Charts**: Interactive data visualization
 - **Toast Notifications**: User feedback and status updates
 
-## 🚦 **Getting Started**
+## 🧰 **Setup**
 
 ### **Prerequisites**
 - Node.js 18+ 
@@ -167,6 +175,32 @@ npm run preview      # Preview production build
 npm run lint         # Run ESLint
 npm run lint:fix     # Fix ESLint issues
 ```
+
+## 🌐 Deployment
+
+This is a SPA (client-side routing). Ensure your host serves `index.html` for unknown routes.
+
+### Vercel
+1. Push the repo to GitHub
+2. Import the project on Vercel
+3. Framework Preset: Vite
+4. Build Command: `npm run build`
+5. Output Directory: `dist`
+6. Add a rewrite for SPA fallback (Vercel adds automatically for Vite)
+
+### Netlify
+1. New site from Git → select this repo
+2. Build command: `npm run build`
+3. Publish directory: `dist`
+4. Add a Redirects rule for SPA fallback:
+
+```
+/*    /index.html   200
+```
+
+### Static hosting (S3/CloudFront, Nginx, etc.)
+- Upload the `dist` folder
+- Configure a catch‑all route to `index.html`
 
 ## 🔌 **API Endpoints**
 
@@ -238,6 +272,21 @@ Components are built with Tailwind CSS and can be easily customized:
 - **XSS Prevention**: Safe rendering of user content
 - **CSRF Protection**: Token-based request validation
 - **Data Encryption**: Sensitive data encryption in storage
+
+## 🧠 Technical Decisions
+
+- Routing: React Router v6 with nested routes and deep-linking for jobs/candidates using slugs
+- State and server sync: TanStack Query for caching, retries, background refresh, and optimistic updates
+- Mock backend: MSW + IndexedDB (Dexie) to simulate realistic API with persistence
+- UI System: Tailwind for utility CSS and shadcn/ui for accessible components
+- Build tool: Vite for fast DX, code-splitting, and optimized production output
+- Error simulation: 200–1200ms latency and ~7.5% error rate across endpoints for resilient UX testing
+
+## ⚠️ Known Issues / Trade‑offs
+
+- Bundle size warnings from Vite due to rich UI and charts; acceptable for demo. Can be reduced via route-level code-splitting and manualChunks.
+- Mock API is client-side only; swapping to a real backend requires replacing MSW handlers with real endpoints but the UI contract is stable.
+- Accessibility reviewed for keyboard and color contrast, but not formally audited.
 
 ## 🤝 **Contributing**
 

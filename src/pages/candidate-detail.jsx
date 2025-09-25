@@ -259,32 +259,30 @@ export default function CandidateDetailPage() {
 
       <div className="relative z-20 space-y-6 p-6 lg:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="space-y-4">
           <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/app/candidates')}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Candidates
-            </Button>
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={candidate.avatar} alt={candidate.name} />
-                <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-                  {candidate.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
-                  {candidate.name}
-                </h1>
-                <p className="text-gray-300 text-lg">{candidate.email}</p>
-              </div>
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={candidate.avatar} alt={candidate.name} />
+              <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                {candidate.name.split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+                {candidate.name}
+              </h1>
+              <p className="text-gray-300 text-lg">{candidate.email}</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/app/candidates')}
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Candidates
+          </Button>
         </div>
 
         {/* Status and Job Info */}

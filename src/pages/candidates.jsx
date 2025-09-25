@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core'
+import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable, defaultDropAnimation } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -231,7 +231,8 @@ function KanbanCard({ candidate, onMove }) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1
+    opacity: isDragging ? 0.9 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab'
   }
 
   return (
@@ -240,7 +241,7 @@ function KanbanCard({ candidate, onMove }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 rounded-2xl p-3 cursor-move hover:shadow-lg hover:scale-105 transition-all duration-300"
+      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/20 rounded-2xl p-3 hover:shadow-lg hover:scale-105 transition-all duration-300"
     >
       <div className="flex items-center gap-2 mb-2">
         <Avatar className="h-8 w-8">
@@ -545,7 +546,7 @@ export function CandidatesPage() {
 
   // Drag and drop sensors for kanban
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates
     })
@@ -732,7 +733,7 @@ export function CandidatesPage() {
       const candidateId = active.id
       await handleStageChange(candidateId, targetStage)
     }
-    setActiveId(null)
+    setTimeout(() => setActiveId(null), 150)
   }
 
   const handleKanbanDragCancel = () => setActiveId(null)
@@ -1007,7 +1008,7 @@ export function CandidatesPage() {
                     />
                   ))}
                 </div>
-                <DragOverlay>
+                <DragOverlay dropAnimation={{ ...defaultDropAnimation, duration: 200 }}>
                   {activeId ? (
                     // Render a lightweight preview; lookup candidate by id from grouped data
                     (() => {

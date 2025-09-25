@@ -148,17 +148,8 @@ export function JobCreatePage() {
         {/* Enhanced Header */}
         <div className="relative">
           <div className="absolute -top-5 -left-5 w-20 h-20 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full blur-2xl"></div>
-          <div className="relative flex items-center gap-6 mb-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/app/jobs')}
-              className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl backdrop-blur-sm transition-all duration-200 flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Jobs
-            </Button>
-            <div className="space-y-2">
+          <div className="relative mb-8">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm border border-white/10 flex items-center justify-center">
                   <Plus className="h-6 w-6 text-green-300" />
@@ -172,6 +163,15 @@ export function JobCreatePage() {
                   <p className="text-gray-300 text-lg">Add a new job posting to your hiring pipeline</p>
                 </div>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/app/jobs')}
+                className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl backdrop-blur-sm transition-all duration-200 flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Jobs
+              </Button>
             </div>
           </div>
         </div>

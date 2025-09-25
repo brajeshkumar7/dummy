@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,17 +31,20 @@ import { Link } from 'react-router-dom'
 import { BulkExportDialog } from '@/components/export-dialog'
 
 // Analytics Charts Components (simplified for now)
-function HiringFunnelChart({ data }) {
+function HiringFunnelChart({ data, total }) {
   const stages = [
     { name: 'Applied', count: data.applied || 0, color: 'bg-gradient-to-r from-blue-500 to-blue-600' },
     { name: 'Screening', count: data.screening || 0, color: 'bg-gradient-to-r from-yellow-500 to-yellow-600' },
-    { name: 'Interview', count: data.interview || 0, color: 'bg-gradient-to-r from-purple-500 to-purple-600' },
-    { name: 'Assessment', count: data.assessment || 0, color: 'bg-gradient-to-r from-orange-500 to-orange-600' },
+    { name: 'Test', count: data.test || 0, color: 'bg-gradient-to-r from-orange-500 to-orange-600' },
     { name: 'Offer', count: data.offer || 0, color: 'bg-gradient-to-r from-green-500 to-green-600' },
-    { name: 'Hired', count: data.hired || 0, color: 'bg-gradient-to-r from-emerald-500 to-emerald-600' }
+    { name: 'Hired', count: data.hired || 0, color: 'bg-gradient-to-r from-emerald-500 to-emerald-600' },
+    { name: 'Rejected', count: data.rejected || 0, color: 'bg-gradient-to-r from-red-500 to-rose-600' }
   ]
 
-  const maxCount = Math.max(...stages.map(s => s.count))
+  // Scale bars against the total candidate count so proportions are correct
+  const denominator = typeof total === 'number' && total > 0
+    ? total
+    : Math.max(1, stages.reduce((acc, s) => acc + (s.count || 0), 0))
 
   return (
     <div className="space-y-4">
@@ -54,7 +57,7 @@ function HiringFunnelChart({ data }) {
           <div className="w-full bg-white/10 rounded-full h-3 backdrop-blur-sm">
             <div
               className={`h-3 rounded-full ${stage.color} transition-all duration-500 shadow-lg`}
-              style={{ width: `${maxCount > 0 ? (stage.count / maxCount) * 100 : 0}%` }}
+              style={{ width: `${denominator > 0 ? (stage.count / denominator) * 100 : 0}%` }}
             />
           </div>
         </div>
@@ -115,8 +118,10 @@ function RecentActivityFeed({ activities }) {
 }
 
 export function Dashboard() {
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
   // Fetch real analytics data
-  const { data: jobsStats } = useQuery({
+  const { data: jobsStats, refetch: refetchJobsStats } = useQuery({
     queryKey: ['jobs', 'stats'],
     queryFn: async () => {
       const response = await fetch('/api/jobs/stats')
@@ -124,7 +129,7 @@ export function Dashboard() {
     }
   })
 
-  const { data: candidatesStats } = useQuery({
+  const { data: candidatesStats, refetch: refetchCandidatesStats } = useQuery({
     queryKey: ['candidates', 'stats'],
     queryFn: async () => {
       const response = await fetch('/api/candidates/stats')
@@ -132,7 +137,7 @@ export function Dashboard() {
     }
   })
 
-  const { data: applicationsStats } = useQuery({
+  const { data: applicationsStats, refetch: refetchApplicationsStats } = useQuery({
     queryKey: ['applications', 'stats'],
     queryFn: async () => {
       const response = await fetch('/api/applications/stats')
@@ -140,7 +145,7 @@ export function Dashboard() {
     }
   })
 
-  const { data: assessmentsStats } = useQuery({
+  const { data: assessmentsStats, refetch: refetchAssessmentsStats } = useQuery({
     queryKey: ['assessments', 'stats'],
     queryFn: async () => {
       const response = await fetch('/api/assessments/stats')
@@ -149,7 +154,7 @@ export function Dashboard() {
   })
 
   // Fetch actual data for bulk export
-  const { data: jobsData } = useQuery({
+  const { data: jobsData, refetch: refetchJobsData } = useQuery({
     queryKey: ['jobs'],
     queryFn: async () => {
       const response = await fetch('/api/jobs?limit=1000')
@@ -166,7 +171,7 @@ export function Dashboard() {
         : 0
 
 
-  const { data: candidatesData } = useQuery({
+  const { data: candidatesData, refetch: refetchCandidatesData } = useQuery({
     queryKey: ['candidates'],
     queryFn: async () => {
       const response = await fetch('/api/candidates?limit=1000')
@@ -174,6 +179,78 @@ export function Dashboard() {
       return result.data || []
     }
   })
+
+  // Refresh function to reload all data
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await Promise.all([
+        refetchJobsStats(),
+        refetchCandidatesStats(),
+        refetchApplicationsStats(),
+        refetchAssessmentsStats(),
+        refetchJobsData(),
+        refetchCandidatesData()
+      ])
+    } catch (error) {
+      console.error('Error refreshing data:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Normalize funnel stats across different stage naming conventions
+  // Prioritize candidate-based counts so totals match the overall candidate total
+  const normalizedFunnel = React.useMemo(() => {
+    const cStats = candidatesStats || {}
+
+    // If we have the full candidates list, compute counts from it for accuracy
+    if (Array.isArray(candidatesData) && candidatesData.length > 0) {
+      const counts = candidatesData.reduce((acc, cand) => {
+        const stage = (cand?.stage || '').toLowerCase()
+        if (stage === 'applied') acc.applied += 1
+        else if (stage === 'screen' || stage === 'screening' || stage === 'review') acc.screening += 1
+        else if (stage === 'test' || stage === 'assessment' || stage === 'interview') acc.test += 1
+        else if (stage === 'offer') acc.offer += 1
+        else if (stage === 'hired') acc.hired += 1
+        else if (stage === 'rejected') acc.rejected += 1
+        return acc
+      }, { applied: 0, screening: 0, test: 0, offer: 0, hired: 0, rejected: 0 })
+      return counts
+    }
+
+    // Fall back to server-provided candidate stats (already aligned to stages)
+    const getNumber = (value) => (typeof value === 'number' ? value : 0)
+    if (cStats && Object.keys(cStats).length > 0) {
+      return {
+        applied: getNumber(cStats.applied),
+        screening: getNumber(cStats.screening) || getNumber(cStats.screen) || getNumber(cStats.review),
+        test: getNumber(cStats.test) || getNumber(cStats.assessment) || getNumber(cStats.interview),
+        offer: getNumber(cStats.offer),
+        hired: getNumber(cStats.hired),
+        rejected: getNumber(cStats.rejected)
+      }
+    }
+
+    // Last resort: use applications stats if candidate stats are unavailable
+    const a = applicationsStats || {}
+    return {
+      applied: getNumber(a.applied),
+      screening: getNumber(a.screening),
+      test: getNumber(a.test) || getNumber(a.assessment) || getNumber(a.interview),
+      offer: getNumber(a.offer),
+      hired: getNumber(a.hired),
+      rejected: getNumber(a.rejected)
+    }
+  }, [applicationsStats, candidatesStats, candidatesData])
+
+  // Total candidates for scaling funnel bars
+  const totalCandidatesForFunnel = React.useMemo(() => {
+    if (candidatesStats?.total) return candidatesStats.total
+    if (Array.isArray(candidatesData)) return candidatesData.length
+    const sum = Object.values(normalizedFunnel || {}).reduce((acc, v) => acc + (typeof v === 'number' ? v : 0), 0)
+    return sum
+  }, [candidatesStats, candidatesData, normalizedFunnel])
 
   // Prepare datasets for bulk export
   const exportDatasets = [
@@ -287,9 +364,15 @@ export function Dashboard() {
                 console.log(`Bulk export completed: ${datasetCount} datasets in ${format} format`)
               }}
             />
-            <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-white/20 text-gray-300 hover:bg-white/10"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
         </div>
@@ -385,7 +468,7 @@ export function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <HiringFunnelChart data={applicationsStats || {}} />
+              <HiringFunnelChart data={normalizedFunnel} total={totalCandidatesForFunnel} />
             </CardContent>
           </Card>
 

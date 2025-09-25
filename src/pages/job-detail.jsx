@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useApplications } from '@/hooks/useApplications'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -39,18 +40,22 @@ export default function JobDetailPage() {
     }
   })
 
-  // Fetch candidates for this job
+  // Fetch candidates for this job (use numeric job.id once loaded to avoid slug issues)
   const { data: candidatesData = { data: [] } } = useQuery({
-    queryKey: ['job-candidates', jobId],
+    queryKey: ['job-candidates', job?.id],
     queryFn: async () => {
-      const response = await fetch(`/api/candidates?jobId=${jobId}`)
+      const response = await fetch(`/api/candidates?jobId=${job.id}`)
       return response.json()
     },
-    enabled: !!jobId
+    enabled: !!job && !!job.id
   })
 
   // Extract candidates array from paginated response
   const candidates = Array.isArray(candidatesData) ? candidatesData : (candidatesData.data || [])
+
+  // Fetch applications for this job (ensure numeric job.id)
+  const { data: applicationsResp } = useApplications({ job_id: job?.id, limit: 1000 })
+  const applications = Array.isArray(applicationsResp?.data) ? applicationsResp.data : (applicationsResp || [])
 
   // Archive/Unarchive mutation
   const archiveMutation = useMutation({
@@ -171,8 +176,16 @@ export default function JobDetailPage() {
         {/* Enhanced Header */}
         <div className="relative">
           <div className="absolute -top-5 -left-5 w-20 h-20 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-2xl"></div>
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+          <div className="relative">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">
+                  <span className="bg-gradient-to-r from-white via-blue-200 to-cyan-200 bg-clip-text text-transparent">
+                    {job.title}
+                  </span>
+                </h1>
+                <p className="text-gray-300 text-lg">{job.company}</p>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -182,43 +195,42 @@ export default function JobDetailPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Jobs
               </Button>
-              <div className="space-y-2">
-                <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">
-                  <span className="bg-gradient-to-r from-white via-blue-200 to-cyan-200 bg-clip-text text-transparent">
-                    {job.title}
-                  </span>
-                </h1>
-                <p className="text-gray-300 text-lg">{job.company}</p>
-              </div>
             </div>
-
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => navigate(`/app/jobs/${jobId}/edit`)}
-                className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl backdrop-blur-sm transition-all duration-200"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Job
-              </Button>
-              <Button
-                variant={job.status === 'archived' ? "default" : "outline"}
-                onClick={handleArchiveToggle}
-                disabled={archiveMutation.isPending} // Changed from isLoading
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-none shadow-lg hover:shadow-orange-500/25 rounded-xl transition-all duration-200 transform hover:scale-[1.02]"
-              >
-                {job.status === 'archived' ? (
-                  <>
-                    <ArchiveRestore className="h-4 w-4 mr-2" />
-                    Unarchive Job
-                  </>
-                ) : (
-                  <>
-                    <Archive className="h-4 w-4 mr-2" />
-                    Archive Job
-                  </>
-                )}
-              </Button>
+            <div className="flex items-center justify-end mt-4">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/app/jobs/${jobId}/edit`)}
+                  className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl backdrop-blur-sm transition-all duration-200"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Job
+                </Button>
+                <Button asChild variant="outline" className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl">
+                  <Link to={`/app/jobs/${jobId}/assessment`}>Assessment Builder</Link>
+                </Button>
+                <Button asChild variant="outline" className="border-white/20 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl">
+                  <Link to={`/app/jobs/${jobId}/assessments`}>Show Assessments</Link>
+                </Button>
+                <Button
+                  variant={job.status === 'archived' ? "default" : "outline"}
+                  onClick={handleArchiveToggle}
+                  disabled={archiveMutation.isPending} // Changed from isLoading
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-none shadow-lg hover:shadow-orange-500/25 rounded-xl transition-all duration-200 transform hover:scale-[1.02]"
+                >
+                  {job.status === 'archived' ? (
+                    <>
+                      <ArchiveRestore className="h-4 w-4 mr-2" />
+                      Unarchive Job
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archive Job
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -370,7 +382,7 @@ export default function JobDetailPage() {
                 <CardContent className="relative p-6">
                   <div className="space-y-6">
                     <div className="text-center p-6 rounded-2xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm border border-white/10">
-                      <p className="text-4xl font-bold bg-gradient-to-r from-white to-green-200 bg-clip-text text-transparent">{candidates.length}</p>
+                      <p className="text-4xl font-bold bg-gradient-to-r from-white to-green-200 bg-clip-text text-transparent">{applications.length}</p>
                       <p className="text-sm text-gray-300 mt-1">Total Applications</p>
                     </div>
 
@@ -380,31 +392,37 @@ export default function JobDetailPage() {
                       <div className="flex justify-between text-sm p-3 rounded-xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm">
                         <span className="text-gray-300">Applied</span>
                         <span className="font-medium text-white">
-                          {candidates.filter(c => c.status === 'applied').length}
+                          {candidates.filter(c => c.stage === 'applied').length}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm p-3 rounded-xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm">
                         <span className="text-gray-300">Screening</span>
                         <span className="font-medium text-white">
-                          {candidates.filter(c => c.status === 'screening').length}
+                          {candidates.filter(c => c.stage === 'screen').length}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm p-3 rounded-xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm">
-                        <span className="text-gray-300">Interview</span>
+                        <span className="text-gray-300">Test</span>
                         <span className="font-medium text-white">
-                          {candidates.filter(c => c.status === 'interview').length}
+                          {candidates.filter(c => c.stage === 'test').length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm p-3 rounded-xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm">
+                        <span className="text-gray-300">Offer</span>
+                        <span className="font-medium text-white">
+                          {candidates.filter(c => c.stage === 'offer').length}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm p-3 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 backdrop-blur-sm border border-green-500/20">
                         <span className="text-gray-300">Hired</span>
                         <span className="font-medium text-green-300">
-                          {candidates.filter(c => c.status === 'hired').length}
+                          {candidates.filter(c => c.stage === 'hired').length}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm p-3 rounded-xl bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm border border-red-500/20">
                         <span className="text-gray-300">Rejected</span>
                         <span className="font-medium text-red-300">
-                          {candidates.filter(c => c.status === 'rejected').length}
+                          {candidates.filter(c => c.stage === 'rejected').length}
                         </span>
                       </div>
                     </div>
@@ -422,53 +440,47 @@ export default function JobDetailPage() {
               </Card>
             </div>
 
-            {/* Enhanced Recent Candidates */}
-            <div className="relative">
+        {/* Applications List */}
+        <div className="relative">
               <div className="absolute -top-4 -left-4 w-20 h-20 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-full blur-2xl"></div>
-              <Card className="relative bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-2xl border border-white/10 shadow-2xl rounded-3xl overflow-hidden">
+          <Card className="relative bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-2xl border border-white/10 shadow-2xl rounded-3xl overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5 opacity-50"></div>
                 <CardHeader className="relative border-b border-white/10 bg-gradient-to-r from-white/5 to-transparent">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-                      <Calendar className="h-5 w-5 text-blue-300" />
+                  <Users className="h-5 w-5 text-blue-300" />
                     </div>
-                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-white via-blue-200 to-indigo-200 bg-clip-text text-transparent">
-                      Recent Applications
+                <CardTitle className="text-xl font-bold bg-gradient-to-r from-white via-blue-200 to-indigo-200 bg-clip-text text-transparent">
+                  Applications
                     </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="relative p-6">
                   <div className="space-y-4">
-                    {candidates.slice(0, 5).map((candidate) => (
-                      <div key={candidate.id} className="flex items-center space-x-3 p-3 rounded-2xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm border border-white/10 hover:from-white/10 hover:to-white/15 transition-all duration-200">
-                        <Avatar className="h-10 w-10 border-2 border-white/20">
-                          <AvatarImage src={candidate.avatar} alt={candidate.name} />
-                          <AvatarFallback className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 text-white border border-white/10">
-                            {candidate.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
+                    <div className="max-h-44 overflow-y-auto pr-4 space-y-4">
+                {applications.map((app) => (
+                      <div key={app.id} className="flex items-center space-x-3 p-3 rounded-2xl bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm border border-white/10 hover:from-white/10 hover:to-white/15 transition-all duration-200">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/10 flex items-center justify-center text-white text-sm">
+                      #{app.id}
+                    </div>
                         <div className="flex-1 min-w-0">
-                          <Link
-                            to={`/app/candidates/${candidate.id}`}
-                            className="text-sm font-medium text-white hover:text-blue-300 transition-colors duration-200"
-                          >
-                            {candidate.name}
-                          </Link>
-                          <p className="text-xs text-gray-400 truncate">
-                            {candidate.email}
-                          </p>
+                      <div className="text-sm font-medium text-white">
+                        Candidate #{app.candidate_id}
+                      </div>
+                      <p className="text-xs text-gray-400">Stage: {app.stage || app.status || 'applied'}</p>
                         </div>
-                        <Badge variant="outline" className="text-xs bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-blue-200">
-                          {candidate.status}
-                        </Badge>
+                    <Badge variant="outline" className="text-xs bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-blue-200">
+                      {new Date(app.applied_at).toLocaleDateString()}
+                    </Badge>
                       </div>
                     ))}
+                    </div>
 
-                    {candidates.length === 0 && (
+                {applications.length === 0 && (
                       <div className="text-center py-8">
                         <Users className="h-12 w-12 text-gray-500 mx-auto mb-3 opacity-50" />
                         <p className="text-sm text-gray-400">
-                          No applications yet
+                      No applications yet for this job
                         </p>
                       </div>
                     )}
