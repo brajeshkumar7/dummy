@@ -5,27 +5,31 @@ import App from './App.jsx'
 import { worker } from './mocks/browser'
 import { initializeDatabase } from './lib/db'
 
-// Start MSW in development
-if (import.meta.env.DEV) {
-  // Seed database first to guarantee data availability for initial queries
-  initializeDatabase()
-    .catch(() => { })
-    .finally(() => {
-      worker.start({ onUnhandledRequest: 'bypass' }).finally(() => {
-        createRoot(document.getElementById('root')).render(
-          <StrictMode>
-            <App />
-          </StrictMode>,
-        )
-      })
-    })
-} else {
-  // In production, just initialize database and render
-  initializeDatabase().then(() => {
-    createRoot(document.getElementById('root')).render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
-    )
+// We wrap the startup logic in an async function to use await.
+async function prepareAndRender() {
+  // First, initialize the in-browser database.
+  await initializeDatabase()
+
+  // Next, start the Mock Service Worker. This will now run
+  // in both development and production.
+  await worker.start({
+    onUnhandledRequest: 'bypass',
+    /**
+     * This is the crucial line for production!
+     * It tells MSW where to find the service worker file on your deployed server.
+     */
+    serviceWorker: {
+      url: '/mockServiceWorker.js',
+    },
   })
+
+  // Finally, render the React application.
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
 }
+
+// Call the function to run the app.
+prepareAndRender()
